@@ -21,6 +21,7 @@ import {
 import { useBaseContext } from "@/base/context";
 import { haveWindow } from "@/base/env";
 import { nameAndExtension } from "@/base/file-name";
+import { formattedDate, formattedTime } from "@/base/i18n-date";
 import log from "@/base/log";
 import type { Location } from "@/base/types";
 import { CopyButton } from "@/gallery/components/FileInfoComponents";
@@ -34,6 +35,7 @@ import { type EnteFile } from "@/media/file";
 import {
     fileCreationPhotoDate,
     fileLocation,
+    filePublicMagicMetadata,
     updateRemotePublicMagicMetadata,
     type ParsedMetadataDate,
 } from "@/media/file-metadata";
@@ -61,8 +63,6 @@ import { FlexWrapper } from "@ente/shared/components/Container";
 import SingleInputForm, {
     type SingleInputFormProps,
 } from "@ente/shared/components/SingleInputForm";
-import { getPublicMagicMetadataSync } from "@ente/shared/file-metadata";
-import { formatDate, formatTime } from "@ente/shared/time/format";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import CameraOutlinedIcon from "@mui/icons-material/CameraOutlined";
 import CloseIcon from "@mui/icons-material/Close";
@@ -124,8 +124,9 @@ export type FileInfoProps = ModalVisibilityProps & {
      * If set, then a clickable chip will be shown for each collection that this
      * file is a part of.
      *
-     * Uses {@link fileCollectionIDs} and {@link allCollectionsNameByID}, so
-     * both of those props should also be set for this to have an effect.
+     * Uses {@link fileCollectionIDs}, {@link allCollectionsNameByID} and
+     * {@link onSelectCollection}, so all of those props should also be set for
+     * this to have an effect.
      */
     showCollections?: boolean;
     /**
@@ -146,11 +147,11 @@ export type FileInfoProps = ModalVisibilityProps & {
      * Called when the user selects a collection from among the collections that
      * the file belongs to.
      */
-    onSelectCollection: (collectionID: number) => void;
+    onSelectCollection?: (collectionID: number) => void;
     /**
      * Called when the user selects a person in the file info panel.
      */
-    onSelectPerson?: ((personID: string) => void) | undefined;
+    onSelectPerson?: (personID: string) => void;
 };
 
 export const FileInfo: React.FC<FileInfoProps> = ({
@@ -315,7 +316,8 @@ export const FileInfo: React.FC<FileInfoProps> = ({
                 )}
                 {showCollections &&
                     fileCollectionIDs &&
-                    allCollectionsNameByID && (
+                    allCollectionsNameByID &&
+                    onSelectCollection && (
                         <InfoItem icon={<FolderOutlinedIcon />}>
                             <Stack
                                 direction="row"
@@ -478,24 +480,22 @@ const InfoItem: React.FC<React.PropsWithChildren<InfoItemProps>> = ({
         sx={{ alignItems: "flex-start", flex: 1, gap: "12px" }}
     >
         <InfoItemIconContainer>{icon}</InfoItemIconContainer>
-        <Box sx={{ flex: 1, mt: "4px" }}>
-            {children ?? (
-                <>
-                    <Typography sx={{ wordBreak: "break-all" }}>
-                        {title}
-                    </Typography>
-                    <Typography
-                        variant="small"
-                        {...(typeof caption == "string"
-                            ? {}
-                            : { component: "div" })}
-                        sx={{ color: "text.muted" }}
-                    >
-                        {caption}
-                    </Typography>
-                </>
-            )}
-        </Box>
+        {children ? (
+            <Box sx={{ flex: 1, mt: "4px" }}>{children}</Box>
+        ) : (
+            <Stack sx={{ flex: 1, mt: "4px", gap: "4px" }}>
+                <Typography sx={{ wordBreak: "break-all" }}>{title}</Typography>
+                <Typography
+                    variant="small"
+                    {...(typeof caption == "string"
+                        ? {}
+                        : { component: "div" })}
+                    sx={{ color: "text.muted" }}
+                >
+                    {caption}
+                </Typography>
+            </Stack>
+        )}
         {trailingButton}
     </Stack>
 );
@@ -669,8 +669,10 @@ const CreationTime: React.FC<CreationTimeProps> = ({
     const openEditMode = () => setIsInEditMode(true);
     const closeEditMode = () => setIsInEditMode(false);
 
-    const publicMagicMetadata = getPublicMagicMetadataSync(file);
-    const originalDate = fileCreationPhotoDate(file, publicMagicMetadata);
+    const originalDate = fileCreationPhotoDate(
+        file,
+        filePublicMagicMetadata(file),
+    );
 
     const saveEdits = async (pickedTime: ParsedMetadataDate) => {
         try {
@@ -715,8 +717,8 @@ const CreationTime: React.FC<CreationTimeProps> = ({
             <FlexWrapper>
                 <InfoItem
                     icon={<CalendarTodayIcon />}
-                    title={formatDate(originalDate)}
-                    caption={formatTime(originalDate)}
+                    title={formattedDate(originalDate)}
+                    caption={formattedTime(originalDate)}
                     trailingButton={
                         allowEdits && (
                             <EditButton
