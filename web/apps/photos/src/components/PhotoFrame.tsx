@@ -1,22 +1,29 @@
+import { useModalVisibility } from "@/base/components/utils/modal";
+import { isSameDay } from "@/base/date";
+import { formattedDate } from "@/base/i18n-date";
 import log from "@/base/log";
+import type { FileInfoProps } from "@/gallery/components/FileInfo";
 import {
     downloadManager,
     type LivePhotoSourceURL,
     type LoadedLivePhotoSourceURL,
     type RenderableSourceURLs,
 } from "@/gallery/services/download";
+import type { Collection } from "@/media/collection";
 import { EnteFile } from "@/media/file";
 import { FileType } from "@/media/file-type";
 import { FileViewer } from "@/new/photos/components/FileViewerComponents";
 import type { GalleryBarMode } from "@/new/photos/components/gallery/reducer";
 import { TRASH_SECTION } from "@/new/photos/services/collection";
 import { styled } from "@mui/material";
-import { PhotoViewer, type PhotoViewerProps } from "components/PhotoViewer";
+import { PhotoViewer } from "components/PhotoViewer";
+import { t } from "i18next";
 import { useRouter } from "next/router";
 import { GalleryContext } from "pages/gallery";
 import PhotoSwipe from "photoswipe";
-import { useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
+import uploadManager from "services/upload/uploadManager";
 import {
     SelectedState,
     SetFilesDownloadProgressAttributesCreator,
@@ -65,9 +72,27 @@ export type DisplayFile = EnteFile & {
     isSourceLoaded?: boolean;
     conversionFailed?: boolean;
     canForceConvert?: boolean;
+    /**
+     * [Note: Timeline date string]
+     *
+     * The timeline date string is a formatted date string under which a
+     * particular file should be grouped in the gallery listing. e.g. "Today",
+     * "Yesterday", "Fri, 21 Feb" etc.
+     *
+     * All files which have the same timelineDateString will be grouped under a
+     * single section in the gallery listing, prefixed by the timelineDateString
+     * itself, and a checkbox to select all files on that date.
+     */
+    timelineDateString?: string;
 };
 
-export interface PhotoFrameProps {
+export type PhotoFrameProps = Pick<
+    FileInfoProps,
+    | "fileCollectionIDs"
+    | "allCollectionsNameByID"
+    | "onSelectCollection"
+    | "onSelectPerson"
+> & {
     mode?: GalleryBarMode;
     /**
      * This is an experimental prop, to see if we can merge the separate
@@ -112,15 +137,12 @@ export interface PhotoFrameProps {
     /** This will be set if mode is "people". */
     activePersonID?: string | undefined;
     enableDownload?: boolean;
-    fileCollectionIDs?: Map<number, number[]>;
-    allCollectionsNameByID?: Map<number, string>;
     showAppDownloadBanner?: boolean;
     setIsPhotoSwipeOpen?: (value: boolean) => void;
     isInHiddenSection?: boolean;
     setFilesDownloadProgressAttributesCreator?: SetFilesDownloadProgressAttributesCreator;
     selectable?: boolean;
-    onSelectPerson?: PhotoViewerProps["onSelectPerson"];
-}
+};
 
 /**
  * TODO: Rename me to FileListWithViewer (or Gallery?)
@@ -145,6 +167,7 @@ const PhotoFrame = ({
     isInHiddenSection,
     setFilesDownloadProgressAttributesCreator,
     selectable,
+    onSelectCollection,
     onSelectPerson,
 }: PhotoFrameProps) => {
     const [open, setOpen] = useState(false);
@@ -159,9 +182,8 @@ const PhotoFrame = ({
     const [isShiftKeyPressed, setIsShiftKeyPressed] = useState(false);
     const router = useRouter();
 
-    // const { show: showPhotoSwipe, props: photoSwipeVisibilityProps } =
-    //     useModalVisibility();
-    const [open5, setOpen5] = useState(false);
+    const { show: showFileViewer, props: fileViewerVisibilityProps } =
+        useModalVisibility();
 
     const [displayFiles, setDisplayFiles] = useState<DisplayFile[] | undefined>(
         undefined,
@@ -173,6 +195,7 @@ const PhotoFrame = ({
             w: window.innerWidth,
             h: window.innerHeight,
             title: file.pubMagicMetadata?.data.caption,
+            timelineDateString: fileTimelineDateString(file),
         }));
         setDisplayFiles(result);
         setFetching({});
@@ -235,6 +258,20 @@ const PhotoFrame = ({
         }
     }, [selected]);
 
+    const handleTriggerSyncWithRemote = useCallback(
+        () => void syncWithRemote(),
+        [syncWithRemote],
+    );
+
+    const handleSaveEditedImageCopy = useCallback(
+        (editedFile: File, collection: Collection, enteFile: EnteFile) => {
+            uploadManager.prepareForNewUpload();
+            uploadManager.showUploadProgressDialog();
+            uploadManager.uploadFile(editedFile, collection, enteFile);
+        },
+        [],
+    );
+
     if (!displayFiles) {
         return <div />;
     }
@@ -260,7 +297,7 @@ const PhotoFrame = ({
 
     const handleClose = (needUpdate) => {
         if (process.env.NEXT_PUBLIC_ENTE_WIP_PS5) {
-            setOpen5(false);
+            throw new Error("Not implemented");
         } else {
             setOpen(false);
             needUpdate && syncWithRemote();
@@ -271,8 +308,7 @@ const PhotoFrame = ({
     const onThumbnailClick = (index: number) => () => {
         setCurrentIndex(index);
         if (process.env.NEXT_PUBLIC_ENTE_WIP_PS5) {
-            // showPhotoSwipe();
-            setOpen5(true);
+            showFileViewer();
         } else {
             setOpen(true);
             setIsPhotoSwipeOpen?.(true);
@@ -282,6 +318,7 @@ const PhotoFrame = ({
     const handleSelect = handleSelectCreator(
         setSelected,
         mode,
+        galleryContext.user?.id,
         activeCollectionID,
         activePersonID,
         setRangeStart,
@@ -308,16 +345,9 @@ const PhotoFrame = ({
                 (index - i) * direction > 0;
                 i += direction
             ) {
-                handleSelect(
-                    displayFiles[i].id,
-                    displayFiles[i].ownerID === galleryContext.user?.id,
-                )(!checked);
+                handleSelect(displayFiles[i])(!checked);
             }
-            handleSelect(
-                displayFiles[index].id,
-                displayFiles[index].ownerID === galleryContext.user?.id,
-                index,
-            )(!checked);
+            handleSelect(displayFiles[index], index)(!checked);
         }
     };
 
@@ -332,11 +362,7 @@ const PhotoFrame = ({
             updateURL={updateThumbURL(index)}
             onClick={onThumbnailClick(index)}
             selectable={selectable}
-            onSelect={handleSelect(
-                item.id,
-                item.ownerID === galleryContext.user?.id,
-                index,
-            )}
+            onSelect={handleSelect(item, index)}
             selected={
                 (!mode
                     ? selected.collectionID === activeCollectionID
@@ -518,12 +544,24 @@ const PhotoFrame = ({
         <Container>
             {process.env.NEXT_PUBLIC_ENTE_WIP_PS5 && (
                 <FileViewer
+                    {...fileViewerVisibilityProps}
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     /* @ts-ignore TODO(PS): test */
-                    open={open5}
-                    onClose={handleClose}
+                    user={galleryContext.user ?? undefined}
                     files={files}
                     initialIndex={currentIndex}
+                    isInTrashSection={activeCollectionID === TRASH_SECTION}
+                    isInHiddenSection={isInHiddenSection}
+                    disableDownload={!enableDownload}
+                    onTriggerSyncWithRemote={handleTriggerSyncWithRemote}
+                    onSaveEditedImageCopy={handleSaveEditedImageCopy}
+                    {...{
+                        favoriteFileIDs,
+                        fileCollectionIDs,
+                        allCollectionsNameByID,
+                        onSelectCollection,
+                        onSelectPerson,
+                    }}
                 />
             )}
             <AutoSizer>
@@ -555,9 +593,10 @@ const PhotoFrame = ({
                     favoriteFileIDs,
                     markUnsyncedFavoriteUpdate,
                     markTempDeleted,
-                    allCollectionsNameByID,
-                    fileCollectionIDs,
                     setFilesDownloadProgressAttributesCreator,
+                    fileCollectionIDs,
+                    allCollectionsNameByID,
+                    onSelectCollection,
                     onSelectPerson,
                 }}
             />
@@ -651,4 +690,16 @@ const updateDisplayFileSource = (
         log.error(`unknown file type - ${file.metadata.fileType}`);
         file.src = url as string;
     }
+};
+
+/**
+ * See: [Note: Timeline date string]
+ */
+const fileTimelineDateString = (item: EnteFile) => {
+    const date = new Date(item.metadata.creationTime / 1000);
+    return isSameDay(date, new Date())
+        ? t("today")
+        : isSameDay(date, new Date(Date.now() - 24 * 60 * 60 * 1000))
+          ? t("yesterday")
+          : formattedDate(date);
 };

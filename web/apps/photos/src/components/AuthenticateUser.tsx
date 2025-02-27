@@ -3,9 +3,9 @@ import {
     TitledMiniDialog,
     type MiniDialogAttributes,
 } from "@/base/components/MiniDialog";
+import type { ModalVisibilityProps } from "@/base/components/utils/modal";
 import { useBaseContext } from "@/base/context";
 import log from "@/base/log";
-import { usePhotosAppContext } from "@/new/photos/types/context";
 import VerifyMasterPasswordForm, {
     type VerifyMasterPasswordFormProps,
 } from "@ente/shared/components/VerifyMasterPasswordForm";
@@ -14,19 +14,25 @@ import type { KeyAttributes, User } from "@ente/shared/user/types";
 import { t } from "i18next";
 import { useCallback, useEffect, useState } from "react";
 
-interface Iprops {
-    open: boolean;
-    onClose: () => void;
+type AuthenticateUserProps = ModalVisibilityProps & {
+    /**
+     * Called when the user successfully reauthenticates themselves.
+     */
     onAuthenticate: () => void;
-}
+};
 
-export default function AuthenticateUserModal({
+/**
+ * A dialog for reauthenticating the logged in user by prompting them for their
+ * password.
+ *
+ * This is used as precursor to performing various sensitive or locked actions.
+ */
+export const AuthenticateUser: React.FC<AuthenticateUserProps> = ({
     open,
     onClose,
     onAuthenticate,
-}: Iprops) {
-    const { logout, showMiniDialog } = useBaseContext();
-    const { onGenericError } = usePhotosAppContext();
+}) => {
+    const { logout, showMiniDialog, onGenericError } = useBaseContext();
     const [user, setUser] = useState<User>();
     const [keyAttributes, setKeyAttributes] = useState<KeyAttributes>();
 
@@ -106,7 +112,7 @@ export default function AuthenticateUserModal({
             />
         </TitledMiniDialog>
     );
-}
+};
 
 /**
  * Attributes for a dialog box that informs the user that their password was
