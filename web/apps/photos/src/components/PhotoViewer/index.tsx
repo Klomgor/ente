@@ -9,8 +9,7 @@ import {
 } from "@/base/components/utils/modal";
 import { lowercaseExtension } from "@/base/file-name";
 import log from "@/base/log";
-import { FileInfo, type FileInfoProps } from "@/gallery/components/FileInfo";
-import { type FileInfoExif } from "@/gallery/components/viewer/data-source";
+import { FileInfo, type FileInfoExif } from "@/gallery/components/FileInfo";
 import { downloadManager } from "@/gallery/services/download";
 import { extractRawExif, parseExif } from "@/gallery/services/exif";
 import type { Collection } from "@/media/collection";
@@ -76,7 +75,13 @@ import { PublicCollectionGalleryContext } from "utils/publicCollectionGallery";
 
 export type PhotoViewerProps = Pick<
     PhotoFrameProps,
-    "favoriteFileIDs" | "markUnsyncedFavoriteUpdate" | "markTempDeleted"
+    | "favoriteFileIDs"
+    | "onMarkUnsyncedFavoriteUpdate"
+    | "onMarkTempDeleted"
+    | "fileCollectionIDs"
+    | "allCollectionsNameByID"
+    | "onSelectCollection"
+    | "onSelectPerson"
 > & {
     /**
      * The PhotoViewer is shown when this is `true`.
@@ -102,9 +107,6 @@ export type PhotoViewerProps = Pick<
     isInHiddenSection: boolean;
     enableDownload: boolean;
     setFilesDownloadProgressAttributesCreator: SetFilesDownloadProgressAttributesCreator;
-    fileCollectionIDs?: Map<number, number[]>;
-    allCollectionsNameByID?: Map<number, string>;
-    onSelectPerson?: FileInfoProps["onSelectPerson"];
 };
 
 /**
@@ -130,14 +132,15 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
     gettingData,
     forceConvertItem,
     favoriteFileIDs,
-    markUnsyncedFavoriteUpdate,
-    markTempDeleted,
+    onMarkUnsyncedFavoriteUpdate,
+    onMarkTempDeleted,
     isTrashCollection,
     isInHiddenSection,
     enableDownload,
     setFilesDownloadProgressAttributesCreator,
     fileCollectionIDs,
     allCollectionsNameByID,
+    onSelectCollection,
     onSelectPerson,
 }) => {
     const { showLoadingBar, hideLoadingBar } = usePhotosAppContext();
@@ -387,7 +390,7 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
         const extension = lowercaseExtension(file.metadata.title);
         // Assume it is supported.
         let isSupported = true;
-        if (needsJPEGConversion(extension)) {
+        if (extension && needsJPEGConversion(extension)) {
             // See if the file is on the whitelist of extensions that we know
             // will not be directly renderable.
             if (!isDesktop) {
@@ -508,16 +511,16 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
         const isFavorite = favoriteFileIDs!.has(file.id);
 
         if (!isFavorite) {
-            markUnsyncedFavoriteUpdate(file.id, true);
+            onMarkUnsyncedFavoriteUpdate(file.id, true);
             void addToFavorites(file).catch((e: unknown) => {
                 log.error("Failed to add favorite", e);
-                markUnsyncedFavoriteUpdate(file.id, undefined);
+                onMarkUnsyncedFavoriteUpdate(file.id, undefined);
             });
         } else {
-            markUnsyncedFavoriteUpdate(file.id, false);
+            onMarkUnsyncedFavoriteUpdate(file.id, false);
             void removeFromFavorites(file).catch((e: unknown) => {
                 log.error("Failed to remove favorite", e);
-                markUnsyncedFavoriteUpdate(file.id, undefined);
+                onMarkUnsyncedFavoriteUpdate(file.id, undefined);
             });
         }
 
@@ -535,7 +538,7 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
     const handleDeleteFile = async () => {
         const file = fileToDelete!;
         await moveToTrash([file]);
-        markTempDeleted?.([file]);
+        onMarkTempDeleted?.([file]);
         updateItems(items.filter((item) => item.id !== file.id));
         setFileToDelete(undefined);
         needUpdate.current = true;
@@ -733,7 +736,7 @@ export const PhotoViewer: React.FC<PhotoViewerProps> = ({
     };
 
     const handleSelectCollection = (collectionID: number) => {
-        galleryContext.onShowCollection(collectionID);
+        onSelectCollection(collectionID);
         handleClose();
     };
 
