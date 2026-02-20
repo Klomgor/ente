@@ -32,6 +32,8 @@ import {
     setupDeviceLock,
     setupPassword,
     setupPin,
+    shouldShowDeviceLockOption,
+    type SetupDeviceLockResult,
 } from "../../services/app-lock";
 import { useAppLockSnapshot } from "../utils/use-snapshot";
 
@@ -45,8 +47,35 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     const [pinDialogOpen, setPinDialogOpen] = useState(false);
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
     const [isSettingDeviceLock, setIsSettingDeviceLock] = useState(false);
+    const [showDeviceLockOption, setShowDeviceLockOption] = useState(false);
     const [autoLockDialogOpen, setAutoLockDialogOpen] = useState(false);
+    const deviceLockOptionRequestGeneration = useRef(0);
     const { showMiniDialog } = useBaseContext();
+
+    useEffect(() => {
+        const generation = ++deviceLockOptionRequestGeneration.current;
+
+        void (async () => {
+            try {
+                const visible = await shouldShowDeviceLockOption();
+                if (deviceLockOptionRequestGeneration.current === generation) {
+                    setShowDeviceLockOption(visible);
+                }
+            } catch (e) {
+                log.warn(
+                    "Failed to determine device lock option visibility",
+                    e,
+                );
+                if (deviceLockOptionRequestGeneration.current === generation) {
+                    setShowDeviceLockOption(false);
+                }
+            }
+        })();
+
+        return () => {
+            deviceLockOptionRequestGeneration.current += 1;
+        };
+    }, []);
 
     const handleRootClose = () => {
         onClose();
@@ -84,14 +113,10 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         setIsSettingDeviceLock(true);
         try {
             const result = await setupDeviceLock();
-            if (result === "success") return;
+            if (result.status === "success") return;
 
             showMiniDialog(
-                errorDialogAttributes(
-                    result === "not-supported"
-                        ? t("device_lock_not_supported")
-                        : t("device_lock_setup_failed"),
-                ),
+                errorDialogAttributes(deviceLockSetupErrorText(result)),
             );
         } catch (e) {
             log.error("Failed to set up device lock app lock", e);
@@ -168,28 +193,32 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
                                         }
                                         onClick={handleSelectPassword}
                                     />
-                                    <RowButtonDivider />
-                                    <RowButton
-                                        label={t("device_lock")}
-                                        caption={
-                                            isSettingDeviceLock
-                                                ? t("loading")
-                                                : undefined
-                                        }
-                                        disabled={isSettingDeviceLock}
-                                        endIcon={
-                                            state.deviceLockEnabled ? (
-                                                <CheckIcon
-                                                    sx={{
-                                                        color: "accent.main",
-                                                    }}
-                                                />
-                                            ) : undefined
-                                        }
-                                        onClick={() =>
-                                            void handleSelectDeviceLock()
-                                        }
-                                    />
+                                    {showDeviceLockOption && (
+                                        <>
+                                            <RowButtonDivider />
+                                            <RowButton
+                                                label={t("device_lock")}
+                                                caption={
+                                                    isSettingDeviceLock
+                                                        ? t("loading")
+                                                        : undefined
+                                                }
+                                                disabled={isSettingDeviceLock}
+                                                endIcon={
+                                                    state.deviceLockEnabled ? (
+                                                        <CheckIcon
+                                                            sx={{
+                                                                color: "accent.main",
+                                                            }}
+                                                        />
+                                                    ) : undefined
+                                                }
+                                                onClick={() =>
+                                                    void handleSelectDeviceLock()
+                                                }
+                                            />
+                                        </>
+                                    )}
                                 </RowButtonGroup>
                             </Stack>
 
@@ -232,6 +261,26 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
             />
         </>
     );
+};
+
+const deviceLockSetupErrorText = (result: SetupDeviceLockResult): string => {
+    if (result.status === "success") return "";
+
+    if (result.status === "not-supported") {
+        switch (result.reason) {
+            case "touchid-api-error":
+                return t("device_lock_setup_failed");
+            case "unsupported-platform":
+            case "touchid-not-enrolled":
+                return t("device_lock_not_supported");
+        }
+    }
+
+    if (result.reason === "native-prompt-failed") {
+        return t("device_lock_setup_cancelled");
+    }
+
+    return t("device_lock_setup_failed");
 };
 
 // -- Auto-lock duration helpers --

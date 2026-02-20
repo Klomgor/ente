@@ -28,6 +28,7 @@ import {
 } from "./services/app-update";
 import autoLauncher from "./services/auto-launcher";
 import {
+    getNativeDeviceLockCapability,
     isDeviceLockSupported,
     promptDeviceLock,
 } from "./services/device-lock";
@@ -131,6 +132,10 @@ export const attachIPCHandlers = () => {
     ipcMain.handle("isAutoLaunchEnabled", () => autoLauncher.isEnabled());
 
     ipcMain.handle("toggleAutoLaunch", () => autoLauncher.toggleAutoLaunch());
+
+    ipcMain.handle("getNativeDeviceLockCapability", () =>
+        getNativeDeviceLockCapability(),
+    );
 
     ipcMain.handle("isDeviceLockSupported", () => isDeviceLockSupported());
 

@@ -3,21 +3,17 @@
  *
  * App lock is a purely client-side feature that prevents unauthorized access to
  * the app after it has been authenticated. It supports PIN, password, and
- * local WebAuthn device lock types, uses Argon2id for passphrase hashing, and
+ * local native device lock (macOS Touch ID), uses Argon2id for passphrase hashing, and
  * syncs lock state across tabs via BroadcastChannel.
  *
  * See: [Note: Snapshots and useSyncExternalStore].
  */
 
-import {
-    deriveInteractiveKey,
-    deriveKey,
-    fromB64URLSafeNoPadding,
-    toB64URLSafeNoPadding,
-} from "ente-base/crypto";
+import { deriveInteractiveKey, deriveKey } from "ente-base/crypto";
 import { getKVN, getKVS, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { haveMasterKeyInSession } from "ente-base/session";
+import type { NativeDeviceLockCapability } from "ente-base/types/ipc";
 
 /**
  * In-memory state for the app lock feature.
@@ -30,7 +26,7 @@ export interface AppLockState {
     enabled: boolean;
     /** Active passphrase lock type. */
     lockType: "pin" | "password" | "none";
-    /** Whether local WebAuthn device lock is enabled. */
+    /** Whether local native device lock is enabled. */
     deviceLockEnabled: boolean;
     /** Whether the app is currently locked. */
     isLocked: boolean;
@@ -119,19 +115,44 @@ const kvKeyOpsLimit = "appLock.opsLimit";
 const kvKeyMemLimit = "appLock.memLimit";
 const kvKeyInvalidAttempts = "appLock.invalidAttempts";
 const kvKeyCooldownExpiresAt = "appLock.cooldownExpiresAt";
-const kvKeyWebAuthnCredentialID = "appLock.webAuthnCredentialID";
 
-// -- WebAuthn constants --
+// -- Device lock constants --
 
-const webAuthnTimeoutMs = 60_000;
-const webAuthnChallengeBytes = 32;
-const userVerifiedFlag = 0x04;
 const deviceLockEnablePromptReason = "Enable device lock for Ente";
 const deviceLockUnlockPromptReason = "Unlock Ente";
 const maxInvalidUnlockAttempts = 10;
 const cooldownStartsAtAttempt = 5;
 const cooldownBaseSeconds = 30;
 const unlockAttemptLockName = "ente-app-lock-unlock-attempt";
+
+export type DeviceLockMode = "native";
+
+export type DeviceLockUnsupportedReason =
+    | "unsupported-platform"
+    | "touchid-not-enrolled"
+    | "touchid-api-error";
+
+export type DeviceLockFailureReason = "native-prompt-failed" | "unknown";
+
+const logDeviceLockUnsupported = (
+    phase: "setup" | "unlock",
+    reason: DeviceLockUnsupportedReason,
+) => {
+    log.warn(`Device lock ${phase} is not supported`, { reason });
+};
+
+const logDeviceLockFailure = (
+    phase: "setup" | "unlock",
+    reason: DeviceLockFailureReason,
+    error?: unknown,
+) => {
+    if (typeof error != "undefined") {
+        log.warn(`Device lock ${phase} failed`, { reason, error });
+        return;
+    }
+
+    log.warn(`Device lock ${phase} failed`, { reason });
+};
 
 /**
  * Return the cooldown duration for a failed-attempt count.
@@ -247,6 +268,14 @@ const normalizeLockType = (lockType: string): AppLockState["lockType"] =>
 const clampNonNegativeInt = (value: number) =>
     Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 
+const isDesktopMacOS = () =>
+    !!globalThis.electron &&
+    typeof navigator != "undefined" &&
+    navigator.userAgent.toUpperCase().includes("MAC");
+
+const normalizeDeviceLockEnabled = (enabled: boolean) =>
+    isDesktopMacOS() ? enabled : false;
+
 interface PersistedAppLockConfig {
     enabled: boolean;
     lockType: AppLockState["lockType"];
@@ -255,7 +284,7 @@ interface PersistedAppLockConfig {
 }
 
 const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
-    const enabled = localStorage.getItem(lsKeyEnabled) === "true";
+    let enabled = localStorage.getItem(lsKeyEnabled) === "true";
     const lockTypeRaw = localStorage.getItem(lsKeyLockType);
     const hasLegacyDeviceLockType =
         lockTypeRaw === "biometric" || lockTypeRaw === "deviceLock";
@@ -270,10 +299,23 @@ const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     // Remove stale key from removed "hide content when switching apps" setting.
     localStorage.removeItem("appLock.hideContentOnBlur");
 
+    const lockType = normalizeLockType(lockTypeRaw ?? "none");
+    const deviceLockEnabled = normalizeDeviceLockEnabled(
+        hasDeviceLockFlag || hasLegacyDeviceLockType,
+    );
+
+    if (!deviceLockEnabled) {
+        localStorage.removeItem(lsKeyDeviceLockEnabled);
+        if (enabled && lockType === "none") {
+            enabled = false;
+            localStorage.setItem(lsKeyEnabled, "false");
+        }
+    }
+
     return {
         enabled,
-        lockType: normalizeLockType(lockTypeRaw ?? "none"),
-        deviceLockEnabled: hasDeviceLockFlag || hasLegacyDeviceLockType,
+        lockType,
+        deviceLockEnabled,
         autoLockTimeMs: clampNonNegativeInt(
             Number(localStorage.getItem(lsKeyAutoLockTimeMs) ?? "0"),
         ),
@@ -372,7 +414,9 @@ if (_channel) {
                     ..._state.snapshot,
                     enabled: data.enabled,
                     lockType,
-                    deviceLockEnabled: data.deviceLockEnabled,
+                    deviceLockEnabled: normalizeDeviceLockEnabled(
+                        data.deviceLockEnabled,
+                    ),
                     autoLockTimeMs,
                 });
                 hydrateBruteForceStateIfNeeded();
@@ -452,111 +496,74 @@ const ensureBruteForceStateHydrated = async () => {
     await _bruteForceStateHydration;
 };
 
-const hasWebAuthnSupport = () =>
-    (() => {
-        if (
-            typeof window == "undefined" ||
-            !window.isSecureContext ||
-            typeof PublicKeyCredential == "undefined"
-        ) {
-            return false;
-        }
+const unsupportedNativeDeviceLockCapability: NativeDeviceLockCapability = {
+    available: false,
+    provider: "none",
+    reason: "unsupported-platform",
+};
 
-        const credentials: CredentialsContainer | undefined =
-            "credentials" in navigator ? navigator.credentials : undefined;
+const nativeDeviceLockCapability =
+    async (): Promise<NativeDeviceLockCapability> => {
+        if (!globalThis.electron) return unsupportedNativeDeviceLockCapability;
 
-        return typeof credentials != "undefined";
-    })();
-
-/**
- * Return true if the current environment can use a platform authenticator for
- * local device lock app unlocks.
- */
-export const isDeviceLockSupported = async () => {
-    if (globalThis.electron) {
         try {
-            const nativeSupported =
-                await globalThis.electron.isDeviceLockSupported();
-            if (nativeSupported) return true;
+            if (
+                typeof globalThis.electron.getNativeDeviceLockCapability ==
+                "function"
+            ) {
+                return await globalThis.electron.getNativeDeviceLockCapability();
+            }
+
+            // Legacy desktop bridge compatibility.
+            // eslint-disable-next-line @typescript-eslint/no-deprecated
+            const supported = await globalThis.electron.isDeviceLockSupported();
+            return supported
+                ? { available: true, provider: "touchid" }
+                : unsupportedNativeDeviceLockCapability;
         } catch (e) {
             log.warn("Failed to query native device lock support", e);
+            return unsupportedNativeDeviceLockCapability;
         }
-    }
+    };
 
-    if (!hasWebAuthnSupport()) return false;
+type DeviceLockCapability =
+    | { usable: true; mode: DeviceLockMode }
+    | { usable: false; reason: DeviceLockUnsupportedReason };
 
-    if (
-        typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !=
-        "function"
-    ) {
-        return true;
-    }
-
-    try {
-        return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    } catch (e) {
-        log.warn("Failed to query platform authenticator availability", e);
-        return false;
-    }
-};
-
-const randomBytes = (length: number) => {
-    const bytes = new Uint8Array(length);
-    crypto.getRandomValues(bytes);
-    return bytes;
-};
-
-const normalizeB64URLNoPadding = (value: string) =>
-    value.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-const parseClientDataJSON = (clientDataJSON: ArrayBuffer) => {
-    try {
-        const json = new TextDecoder().decode(clientDataJSON);
-        return JSON.parse(json) as {
-            type?: string;
-            challenge?: string;
-            origin?: string;
-        };
-    } catch (e) {
-        log.error("Failed to parse WebAuthn clientDataJSON", e);
-        return undefined;
+const nativeCapabilityUnavailableReason = (
+    capability: NativeDeviceLockCapability,
+): DeviceLockUnsupportedReason => {
+    switch (capability.reason) {
+        case "touchid-not-enrolled":
+        case "touchid-api-error":
+            return capability.reason;
+        default:
+            return "unsupported-platform";
     }
 };
 
-const isUserVerified = (authenticatorData: ArrayBuffer) => {
-    const data = new Uint8Array(authenticatorData);
-    const flagsOffset = 32;
-    if (data.length <= flagsOffset) return false;
-    const flags = data[flagsOffset] ?? 0;
-    return (flags & userVerifiedFlag) !== 0;
+const resolveDeviceLockCapability = async (): Promise<DeviceLockCapability> => {
+    const nativeCapability = await nativeDeviceLockCapability();
+    if (nativeCapability.available) return { usable: true, mode: "native" };
+
+    return {
+        usable: false,
+        reason: nativeCapabilityUnavailableReason(nativeCapability),
+    };
 };
 
-const isArrayBuffer = (value: unknown): value is ArrayBuffer =>
-    value instanceof ArrayBuffer;
+/**
+ * Return true if the current environment supports native device lock app
+ * unlocks.
+ */
+export const isDeviceLockSupported = async () => {
+    const capability = await resolveDeviceLockCapability();
+    return capability.usable;
+};
 
-const assertionResponseFromCredential = (credential: PublicKeyCredential) => {
-    const response = credential.response as
-        | AuthenticatorAssertionResponse
-        | undefined;
-    if (!response) return undefined;
-
-    if (
-        !isArrayBuffer(response.clientDataJSON) ||
-        !isArrayBuffer(response.authenticatorData) ||
-        !isArrayBuffer(response.signature)
-    ) {
-        return undefined;
-    }
-
-    if (
-        response.clientDataJSON.byteLength === 0 ||
-        response.authenticatorData.byteLength === 0 ||
-        response.signature.byteLength === 0
-    ) {
-        return undefined;
-    }
-
-    return response;
+export const shouldShowDeviceLockOption = async () => {
+    const capability = await nativeDeviceLockCapability();
+    return capability.available || capability.reason !== "unsupported-platform";
 };
 
 const clearPassphraseMaterial = async () =>
@@ -601,11 +608,14 @@ export const refreshAppLockStateFromSession = () => {
 /**
  * The result of a device lock setup attempt.
  *
- * - `"success"` - Device lock setup completed and app lock configured.
- * - `"not-supported"` - Platform authenticator is not available.
- * - `"failed"` - Setup failed or was cancelled.
+ * - `success` - Device lock setup completed and app lock configured.
+ * - `not-supported` - Platform authenticator is unavailable in this context.
+ * - `failed` - Setup failed or was cancelled by the user.
  */
-export type SetupDeviceLockResult = "success" | "not-supported" | "failed";
+export type SetupDeviceLockResult =
+    | { status: "success"; mode: DeviceLockMode }
+    | { status: "not-supported"; reason: DeviceLockUnsupportedReason }
+    | { status: "failed"; reason: DeviceLockFailureReason };
 
 /**
  * Set up a PIN for app lock.
@@ -651,93 +661,25 @@ export const setupPassword = async (password: string) =>
     setupPassphraseLock("password", password);
 
 /**
- * Set up local WebAuthn device lock authentication for app lock.
- *
- * On desktop Electron, this first tries native OS authentication; if that's
- * unavailable, it falls back to a local WebAuthn credential flow.
- *
- * The WebAuthn fallback creates a platform credential locally using
- * `navigator.credentials` without any backend ceremony. The created credential
- * ID is stored in KV DB and used for future local unlock requests.
+ * Set up native device lock authentication for app lock (macOS only).
  */
 export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
+    const capability = await resolveDeviceLockCapability();
+    if (!capability.usable) {
+        logDeviceLockUnsupported("setup", capability.reason);
+        return { status: "not-supported", reason: capability.reason };
+    }
+
     try {
-        if (globalThis.electron) {
-            try {
-                const nativeSupported =
-                    await globalThis.electron.isDeviceLockSupported();
-                if (nativeSupported) {
-                    const unlocked = await globalThis.electron.promptDeviceLock(
-                        deviceLockEnablePromptReason,
-                    );
-                    if (!unlocked) return "failed";
-
-                    await resetBruteForceState(true);
-
-                    localStorage.setItem(lsKeyDeviceLockEnabled, "true");
-                    localStorage.setItem(lsKeyEnabled, "true");
-
-                    setSnapshot({
-                        ..._state.snapshot,
-                        enabled: true,
-                        deviceLockEnabled: true,
-                        invalidAttemptCount: 0,
-                        cooldownExpiresAt: 0,
-                    });
-                    stopBruteForceStateHydration();
-                    syncConfigAcrossTabs(_state.snapshot);
-
-                    return "success";
-                }
-            } catch (e) {
-                log.warn(
-                    "Native device lock setup unavailable, trying WebAuthn fallback",
-                    e,
-                );
-            }
-        }
-
-        if (!hasWebAuthnSupport()) {
-            return "not-supported";
-        }
-
-        const challenge = randomBytes(webAuthnChallengeBytes);
-        const userID = randomBytes(webAuthnChallengeBytes);
-
-        const credential = (await navigator.credentials.create({
-            publicKey: {
-                challenge,
-                rp: { name: "Ente Photos App Lock" },
-                user: {
-                    id: userID,
-                    name: "ente-app-lock",
-                    displayName: "Ente App Lock",
-                },
-                pubKeyCredParams: [
-                    { type: "public-key", alg: -7 },
-                    { type: "public-key", alg: -257 },
-                ],
-                authenticatorSelection: {
-                    authenticatorAttachment: "platform",
-                    userVerification: "required",
-                },
-                timeout: webAuthnTimeoutMs,
-                attestation: "none",
-            },
-        })) as PublicKeyCredential | null;
-
-        if (!credential) {
-            return "failed";
-        }
-
-        const credentialID = await toB64URLSafeNoPadding(
-            new Uint8Array(credential.rawId),
+        const unlocked = await globalThis.electron?.promptDeviceLock(
+            deviceLockEnablePromptReason,
         );
+        if (!unlocked) {
+            logDeviceLockFailure("setup", "native-prompt-failed");
+            return { status: "failed", reason: "native-prompt-failed" };
+        }
 
-        await Promise.all([
-            setKV(kvKeyWebAuthnCredentialID, credentialID),
-            resetBruteForceState(true),
-        ]);
+        await resetBruteForceState(true);
 
         localStorage.setItem(lsKeyDeviceLockEnabled, "true");
         localStorage.setItem(lsKeyEnabled, "true");
@@ -752,10 +694,10 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
         stopBruteForceStateHydration();
         syncConfigAcrossTabs(_state.snapshot);
 
-        return "success";
+        return { status: "success", mode: "native" };
     } catch (e) {
         log.error("Failed to set up device lock app lock", e);
-        return "failed";
+        return { status: "failed", reason: "unknown" };
     }
 };
 
@@ -772,141 +714,37 @@ export type UnlockResult = "success" | "failed" | "cooldown" | "logout";
 /**
  * The result of a device lock unlock attempt.
  */
-export type DeviceLockUnlockResult = "success" | "failed" | "not-supported";
+export type DeviceLockUnlockResult =
+    | { status: "success"; mode: DeviceLockMode }
+    | { status: "not-supported"; reason: DeviceLockUnsupportedReason }
+    | { status: "failed"; reason: DeviceLockFailureReason };
 
 /**
- * Attempt to unlock the app with a local WebAuthn device lock check.
- *
- * This is a fully local verification flow and does not call any backend API.
- *
- * Security note: This flow uses browser-provided credential APIs and validates
- * challenge/type/origin/credential-id/user-verification locally. It is
- * designed as a local app-lock boundary, not as a replacement for server-side
- * WebAuthn authentication ceremonies.
+ * Attempt to unlock the app using native device lock (macOS only).
  */
 export const attemptDeviceLockUnlock =
     async (): Promise<DeviceLockUnlockResult> => {
-        if (globalThis.electron) {
-            try {
-                const nativeSupported =
-                    await globalThis.electron.isDeviceLockSupported();
-                if (nativeSupported) {
-                    const unlocked = await globalThis.electron.promptDeviceLock(
-                        deviceLockUnlockPromptReason,
-                    );
-                    if (!unlocked) return "failed";
-
-                    await resetBruteForceState();
-                    unlockLocally();
-                    return "success";
-                }
-            } catch (e) {
-                log.warn(
-                    "Native device lock unlock unavailable, trying WebAuthn fallback",
-                    e,
-                );
-            }
-        }
-
-        if (!hasWebAuthnSupport()) {
-            return "not-supported";
-        }
-
-        const storedCredentialID = await getKVS(kvKeyWebAuthnCredentialID);
-        if (!storedCredentialID) {
-            log.error("Device lock app lock credential missing from KV DB");
-            return "failed";
+        const capability = await resolveDeviceLockCapability();
+        if (!capability.usable) {
+            logDeviceLockUnsupported("unlock", capability.reason);
+            return { status: "not-supported", reason: capability.reason };
         }
 
         try {
-            const challengeBytes = randomBytes(webAuthnChallengeBytes);
-            const challengeB64 = await toB64URLSafeNoPadding(challengeBytes);
-            const storedCredentialIDBytes =
-                await fromB64URLSafeNoPadding(storedCredentialID);
-
-            const credential = (await navigator.credentials.get({
-                publicKey: {
-                    challenge: challengeBytes,
-                    allowCredentials: [
-                        {
-                            id: storedCredentialIDBytes,
-                            type: "public-key",
-                            transports: ["internal"],
-                        },
-                    ],
-                    timeout: webAuthnTimeoutMs,
-                    userVerification: "required",
-                },
-            })) as PublicKeyCredential | null;
-
-            if (!credential) {
-                return "failed";
-            }
-
-            if (credential.type !== "public-key") {
-                log.error("Device lock unlock credential type mismatch");
-                return "failed";
-            }
-            if (!(credential.rawId instanceof ArrayBuffer)) {
-                log.error("Device lock unlock credential rawId missing");
-                return "failed";
-            }
-            if (credential.rawId.byteLength === 0) {
-                log.error("Device lock unlock credential rawId is empty");
-                return "failed";
-            }
-
-            const response = assertionResponseFromCredential(credential);
-            if (!response) {
-                log.error("Device lock unlock response is malformed");
-                return "failed";
-            }
-
-            const clientData = parseClientDataJSON(response.clientDataJSON);
-            if (!clientData) {
-                return "failed";
-            }
-
-            const challengeMatches =
-                normalizeB64URLNoPadding(clientData.challenge ?? "") ===
-                challengeB64;
-            if (!challengeMatches || clientData.type !== "webauthn.get") {
-                log.error("Device lock unlock challenge verification failed");
-                return "failed";
-            }
-
-            if (clientData.origin !== window.location.origin) {
-                log.error("Device lock unlock origin verification failed");
-                return "failed";
-            }
-
-            const credentialIDMatches =
-                normalizeB64URLNoPadding(
-                    await toB64URLSafeNoPadding(
-                        new Uint8Array(credential.rawId),
-                    ),
-                ) === normalizeB64URLNoPadding(storedCredentialID);
-            if (!credentialIDMatches) {
-                log.error("Device lock unlock credential ID mismatch");
-                return "failed";
-            }
-
-            if (!isUserVerified(response.authenticatorData)) {
-                log.error("Device lock unlock missing user verification");
-                return "failed";
+            const unlocked = await globalThis.electron?.promptDeviceLock(
+                deviceLockUnlockPromptReason,
+            );
+            if (!unlocked) {
+                logDeviceLockFailure("unlock", "native-prompt-failed");
+                return { status: "failed", reason: "native-prompt-failed" };
             }
 
             await resetBruteForceState();
             unlockLocally();
-            return "success";
+            return { status: "success", mode: "native" };
         } catch (e) {
-            // User cancellation and timeout surface as NotAllowedError.
-            if (e instanceof DOMException && e.name === "NotAllowedError") {
-                return "failed";
-            }
-
             log.error("Failed device lock unlock attempt", e);
-            return "failed";
+            return { status: "failed", reason: "unknown" };
         }
     };
 
@@ -1020,7 +858,6 @@ export const logoutAppLock = async () => {
         clearPassphraseMaterial(),
         removeKV(kvKeyInvalidAttempts),
         removeKV(kvKeyCooldownExpiresAt),
-        removeKV(kvKeyWebAuthnCredentialID),
     ]);
 
     stopBruteForceStateHydration();
@@ -1051,7 +888,6 @@ export const disableAppLock = async () => {
         clearPassphraseMaterial(),
         removeKV(kvKeyInvalidAttempts),
         removeKV(kvKeyCooldownExpiresAt),
-        removeKV(kvKeyWebAuthnCredentialID),
     ]);
 
     localStorage.setItem(lsKeyEnabled, "false");

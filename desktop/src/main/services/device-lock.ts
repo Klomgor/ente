@@ -1,21 +1,53 @@
 import { systemPreferences } from "electron/main";
+import type { NativeDeviceLockCapability } from "../../types/ipc";
 import log from "../log";
 
 /**
- * Return true if native device lock authentication is available.
+ * Return native device lock capability for the current platform.
  *
- * Currently this uses macOS Touch ID prompt APIs from Electron.
+ * Electron currently exposes native prompt APIs only on macOS (Touch ID).
  */
-export const isDeviceLockSupported = () => {
-    if (process.platform !== "darwin") return false;
+export const getNativeDeviceLockCapability = (): NativeDeviceLockCapability => {
+    switch (process.platform) {
+        case "darwin":
+            try {
+                if (systemPreferences.canPromptTouchID()) {
+                    return { available: true, provider: "touchid" };
+                }
 
-    try {
-        return systemPreferences.canPromptTouchID();
-    } catch (e) {
-        log.warn("Failed to determine native device lock availability", e);
-        return false;
+                return {
+                    available: false,
+                    provider: "none",
+                    reason: "touchid-not-enrolled",
+                };
+            } catch (e) {
+                log.warn(
+                    "Failed to determine native device lock availability",
+                    e,
+                );
+                return {
+                    available: false,
+                    provider: "none",
+                    reason: "touchid-api-error",
+                };
+            }
+
+        default:
+            return {
+                available: false,
+                provider: "none",
+                reason: "unsupported-platform",
+            };
     }
 };
+
+/**
+ * Legacy compatibility helper used by older renderer flows.
+ *
+ * Prefer {@link getNativeDeviceLockCapability}.
+ */
+export const isDeviceLockSupported = () =>
+    getNativeDeviceLockCapability().available;
 
 /**
  * Prompt the user to unlock using native device authentication.
@@ -24,7 +56,11 @@ export const isDeviceLockSupported = () => {
  * cancelled, or failed.
  */
 export const promptDeviceLock = async (reason: string) => {
-    if (!isDeviceLockSupported()) return false;
+    const capability = getNativeDeviceLockCapability();
+
+    if (!capability.available || capability.provider !== "touchid") {
+        throw new Error("Native device lock prompt is unavailable on this OS");
+    }
 
     try {
         await systemPreferences.promptTouchID(reason);

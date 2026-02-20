@@ -3,6 +3,19 @@
 //
 // See [Note: types.ts <-> preload.ts <-> ipc.ts]
 
+export type NativeDeviceLockProvider = "touchid" | "none";
+
+export type NativeDeviceLockUnavailableReason =
+    | "unsupported-platform"
+    | "touchid-not-enrolled"
+    | "touchid-api-error";
+
+export interface NativeDeviceLockCapability {
+    available: boolean;
+    provider: NativeDeviceLockProvider;
+    reason?: NativeDeviceLockUnavailableReason;
+}
+
 /**
  * Extra APIs provided by our Node.js layer when our code is running inside our
  * desktop (Electron) app.
@@ -159,7 +172,14 @@ export interface Electron {
     toggleAutoLaunch: () => Promise<void>;
 
     /**
+     * Return native device lock capability details for the current platform.
+     */
+    getNativeDeviceLockCapability: () => Promise<NativeDeviceLockCapability>;
+
+    /**
      * Return true if native device lock authentication is available.
+     *
+     * @deprecated Prefer {@link getNativeDeviceLockCapability}.
      */
     isDeviceLockSupported: () => Promise<boolean>;
 

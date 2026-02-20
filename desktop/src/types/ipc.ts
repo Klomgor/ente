@@ -12,6 +12,19 @@ export interface AppUpdate {
     version: string;
 }
 
+export type NativeDeviceLockProvider = "touchid" | "none";
+
+export type NativeDeviceLockUnavailableReason =
+    | "unsupported-platform"
+    | "touchid-not-enrolled"
+    | "touchid-api-error";
+
+export interface NativeDeviceLockCapability {
+    available: boolean;
+    provider: NativeDeviceLockProvider;
+    reason?: NativeDeviceLockUnavailableReason;
+}
+
 export interface FolderWatch {
     collectionMapping: CollectionMapping;
     folderPath: string;

@@ -2,8 +2,8 @@
  * @file Full-viewport lock screen overlay for the app lock feature.
  *
  * Renders as a sibling of the page Component in _app.tsx, covering all content
- * when the app is locked. Supports PIN (4-digit), password, and local
- * WebAuthn device lock unlock modes, with brute-force cooldown display and a
+ * when the app is locked. Supports PIN (4-digit), password, and local native
+ * device lock unlock mode, with brute-force cooldown display and a
  * logout escape hatch.
  */
 
@@ -216,13 +216,23 @@ const useCooldownState = (
 };
 
 const deviceLockErrorText = (result: DeviceLockUnlockResult) => {
-    switch (result) {
-        case "not-supported":
-            return t("device_lock_not_supported");
-        case "failed":
+    if (result.status === "success") return undefined;
+
+    if (result.status === "not-supported") {
+        switch (result.reason) {
+            case "touchid-api-error":
+                return t("device_lock_login_failed");
+            case "unsupported-platform":
+            case "touchid-not-enrolled":
+                return t("device_lock_not_supported");
+        }
+    }
+
+    switch (result.reason) {
+        case "native-prompt-failed":
+            return t("device_lock_login_cancelled");
+        default:
             return t("device_lock_login_failed");
-        case "success":
-            return undefined;
     }
 };
 
