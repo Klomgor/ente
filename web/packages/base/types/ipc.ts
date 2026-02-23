@@ -3,16 +3,32 @@
 //
 // See [Note: types.ts <-> preload.ts <-> ipc.ts]
 
+/**
+ * Native provider used for desktop app lock authentication.
+ *
+ * `touchid` means we can use the platform-native auth prompt.
+ * `none` means no supported native provider is currently available.
+ */
 export type NativeDeviceLockProvider = "touchid" | "none";
 
+/**
+ * Why native device lock is unavailable on this machine/session.
+ */
 export type NativeDeviceLockUnavailableReason =
     | "unsupported-platform"
     | "touchid-not-enrolled"
     | "touchid-api-error";
 
+/**
+ * Capability metadata used by the renderer to decide whether to show and use
+ * "Device lock" as an app-lock mode.
+ */
 export interface NativeDeviceLockCapability {
+    /** True when native auth can be prompted right now. */
     available: boolean;
+    /** Which native provider backs authentication (if available). */
     provider: NativeDeviceLockProvider;
+    /** Present when unavailable, with a machine-readable reason. */
     reason?: NativeDeviceLockUnavailableReason;
 }
 
@@ -172,20 +188,17 @@ export interface Electron {
     toggleAutoLaunch: () => Promise<void>;
 
     /**
-     * Return native device lock capability details for the current platform.
+     * Return native device lock capability details for the current machine.
+     *
+     * Includes whether native auth is available, provider metadata, and a
+     * reason when unavailable.
      */
     getNativeDeviceLockCapability: () => Promise<NativeDeviceLockCapability>;
 
     /**
-     * Return true if native device lock authentication is available.
-     *
-     * @deprecated Prefer {@link getNativeDeviceLockCapability}.
-     */
-    isDeviceLockSupported: () => Promise<boolean>;
-
-    /**
      * Prompt native device lock authentication.
      *
+     * The {@link reason} can be shown by the OS in the native auth prompt.
      * Returns true on successful authentication.
      */
     promptDeviceLock: (reason: string) => Promise<boolean>;

@@ -1,11 +1,6 @@
 import CheckIcon from "@mui/icons-material/Check";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import {
-    DialogActions,
-    Stack,
-    TextField,
-    Typography,
-} from "@mui/material";
+import { DialogActions, Stack, TextField, Typography } from "@mui/material";
 import { TitledMiniDialog } from "ente-base/components/MiniDialog";
 import { FocusVisibleButton } from "ente-base/components/mui/FocusVisibleButton";
 import { ShowHidePasswordInputAdornment } from "ente-base/components/mui/PasswordInputAdornment";
@@ -43,21 +38,27 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
 }) => {
     const state = useAppLockSnapshot();
 
+    // For the 4-digit PIN setup and confirmation dialog.
     const [pinDialogOpen, setPinDialogOpen] = useState(false);
+    // For the password setup and confirmation dialog.
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+    // Loading/disable flag while async device-lock setup is running.
     const [isSettingDeviceLock, setIsSettingDeviceLock] = useState(false);
+    // Controls whether the Device lock option should be shown after a compatibility check.
     const [showDeviceLockOption, setShowDeviceLockOption] = useState(false);
+    // For the auto-lock duration selection dialog.
     const [autoLockDialogOpen, setAutoLockDialogOpen] = useState(false);
-    const deviceLockOptionRequestGeneration = useRef(0);
+    // Cancel flag used to avoid state updates after unmount.
+    const isDeviceLockOptionRequestCancelled = useRef(false);
     const { showMiniDialog } = useBaseContext();
 
     useEffect(() => {
-        const generation = ++deviceLockOptionRequestGeneration.current;
+        isDeviceLockOptionRequestCancelled.current = false;
 
         void (async () => {
             try {
                 const visible = await shouldShowDeviceLockOption();
-                if (deviceLockOptionRequestGeneration.current === generation) {
+                if (!isDeviceLockOptionRequestCancelled.current) {
                     setShowDeviceLockOption(visible);
                 }
             } catch (e) {
@@ -65,14 +66,14 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
                     "Failed to determine device lock option visibility",
                     e,
                 );
-                if (deviceLockOptionRequestGeneration.current === generation) {
+                if (!isDeviceLockOptionRequestCancelled.current) {
                     setShowDeviceLockOption(false);
                 }
             }
         })();
 
         return () => {
-            deviceLockOptionRequestGeneration.current += 1;
+            isDeviceLockOptionRequestCancelled.current = true;
         };
     }, []);
 

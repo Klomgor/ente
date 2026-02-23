@@ -500,6 +500,8 @@ const unsupportedNativeDeviceLockCapability: NativeDeviceLockCapability = {
 
 const nativeDeviceLockCapability =
     async (): Promise<NativeDeviceLockCapability> => {
+        // Native device lock is available only in the desktop (Electron) app.
+        // On web, we always treat it as unsupported.
         if (!globalThis.electron) return unsupportedNativeDeviceLockCapability;
 
         try {
@@ -510,12 +512,7 @@ const nativeDeviceLockCapability =
                 return await globalThis.electron.getNativeDeviceLockCapability();
             }
 
-            // Legacy desktop bridge compatibility.
-            // eslint-disable-next-line @typescript-eslint/no-deprecated
-            const supported = await globalThis.electron.isDeviceLockSupported();
-            return supported
-                ? { available: true, provider: "touchid" }
-                : unsupportedNativeDeviceLockCapability;
+            return unsupportedNativeDeviceLockCapability;
         } catch (e) {
             log.warn("Failed to query native device lock support", e);
             return unsupportedNativeDeviceLockCapability;
@@ -557,6 +554,14 @@ export const isDeviceLockSupported = async () => {
     return capability.usable;
 };
 
+/**
+ * Return true if the current environment should show "Device lock" in the
+ * lock-type picker.
+ *
+ * We show it when native auth is currently available, or when the platform
+ * supports it but setup/auth is temporarily unavailable (for example, Touch ID
+ * not enrolled).
+ */
 export const shouldShowDeviceLockOption = async () => {
     const capability = await nativeDeviceLockCapability();
     return capability.available || capability.reason !== "unsupported-platform";

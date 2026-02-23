@@ -133,12 +133,24 @@ export const attachIPCHandlers = () => {
 
     ipcMain.handle("toggleAutoLaunch", () => autoLauncher.toggleAutoLaunch());
 
+    // - Desktop app lock (native device authentication)
+    //
+    // These handlers are the main-process bridge for the desktop app lock flow:
+    // the renderer asks about native auth capability/support, then requests a
+    // native unlock prompt when the user needs to unlock the app.
+
+    // Returns richer capability details (for example, available prompt type)
+    // so the UI can decide which app-lock option to show.
     ipcMain.handle("getNativeDeviceLockCapability", () =>
         getNativeDeviceLockCapability(),
     );
 
+    // Returns a simple yes/no for whether native device lock can be used on
+    // this machine. Useful for quick feature gating in settings.
     ipcMain.handle("isDeviceLockSupported", () => isDeviceLockSupported());
 
+    // Triggers the OS-native authentication prompt (Touch ID / Windows Hello /
+    // etc.) and returns the auth result back to the renderer.
     ipcMain.handle("promptDeviceLock", (_, reason: string) =>
         promptDeviceLock(reason),
     );
