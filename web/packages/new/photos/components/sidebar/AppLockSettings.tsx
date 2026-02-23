@@ -77,6 +77,9 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         };
     }, []);
 
+    /**
+     * Close both levels of the nested drawer.
+     */
     const handleRootClose = () => {
         onClose();
         onRootClose();
@@ -108,10 +111,14 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     }, []);
 
     const handleSelectDeviceLock = useCallback(async () => {
+        // Ignore repeated clicks while setup is already running.
         if (isSettingDeviceLock) return;
 
+        // Show loading state while native device-lock setup runs.
         setIsSettingDeviceLock(true);
         try {
+            // setupDeviceLock performs capability checks and returns typed
+            // failure reasons when setup is unavailable or not completed.
             const result = await setupDeviceLock();
             if (result.status === "success") return;
 
@@ -128,10 +135,12 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         }
     }, [isSettingDeviceLock, showMiniDialog]);
 
+    // Close the PIN setup dialog after a successful setup.
     const handlePinSetupComplete = useCallback(() => {
         setPinDialogOpen(false);
     }, []);
 
+    // Close the password setup dialog after a successful setup.
     const handlePasswordSetupComplete = useCallback(() => {
         setPasswordDialogOpen(false);
     }, []);

@@ -575,6 +575,12 @@ const clearPassphraseMaterial = async () =>
         removeKV(kvKeyMemLimit),
     ]);
 
+/**
+ * Reset brute-force protection state.
+ *
+ * Clears persisted invalid-attempt and cooldown values in KV, updates the
+ * in-memory snapshot to zero, and optionally broadcasts the reset to other tabs.
+ */
 const resetBruteForceState = async (shouldBroadcast = false) => {
     await Promise.all([
         setKV(kvKeyInvalidAttempts, 0),
@@ -665,13 +671,19 @@ export const setupPassword = async (password: string) =>
  * Set up native device lock authentication for app lock (macOS only).
  */
 export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
+    // Resolve whether native device lock is currently usable in this environment.
+    // Flow: resolveDeviceLockCapability() -> nativeDeviceLockCapability() ->
+    // globalThis.electron.getNativeDeviceLockCapability().
     const capability = await resolveDeviceLockCapability();
+
+    // Surface unsupported reasons to callers/UI.
     if (!capability.usable) {
         logDeviceLockUnsupported("setup", capability.reason);
         return { status: "not-supported", reason: capability.reason };
     }
 
     try {
+        // Trigger the OS-native authentication prompt (for example, Touch ID).
         const unlocked = await globalThis.electron?.promptDeviceLock(
             deviceLockEnablePromptReason,
         );
@@ -680,11 +692,14 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
             return { status: "failed", reason: "native-prompt-failed" };
         }
 
+        // Reset brute-force lockout/cooldown state in KV and in memory.
         await resetBruteForceState(true);
 
+        // Save the selected app-lock method and enabled state in localStorage.
         localStorage.setItem(lsKeyAppLockMethod, "device");
         localStorage.setItem(lsKeyEnabled, "true");
 
+        // Update the in-memory app-lock snapshot.
         setSnapshot({
             ..._state.snapshot,
             enabled: true,
@@ -692,6 +707,8 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
             invalidAttemptCount: 0,
             cooldownExpiresAt: 0,
         });
+
+        // Stop ongoing brute-force hydration and sync config to other tabs/windows.
         stopBruteForceStateHydration();
         syncConfigAcrossTabs(_state.snapshot);
 
