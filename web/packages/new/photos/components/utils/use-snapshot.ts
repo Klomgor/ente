@@ -21,7 +21,7 @@ import {
  * to updates.
  */
 export const useAppLockSnapshot = () =>
-    useSyncExternalStore(appLockSubscribe, appLockSnapshot, appLockSnapshot);
+    useSyncExternalStore(appLockSubscribe, appLockSnapshot);
 
 /**
  * A convenience hook that returns {@link settingsSnapshot}, and also

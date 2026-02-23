@@ -100,10 +100,11 @@ const setSnapshot = (snapshot: AppLockState) => {
 // -- localStorage keys (synchronous, for cold-start reads) --
 
 const lsKeyEnabled = "appLock.enabled";
-const lsKeyLockType = "appLock.lockType";
+// Stores the selected app-lock method ("pin" | "password" | "device" | "none").
+const lsKeyAppLockMethod = "appLock.lockType";
 const lsKeyAutoLockTimeMs = "appLock.autoLockTimeMs";
 // Removed config key from older app-lock implementation; clear it on resets.
-const lsKeyDeviceLockEnabled = "appLock.deviceLockEnabled";
+const lsLegacyKeyDeviceLockEnabled = "appLock.deviceLockEnabled";
 
 // -- KV DB keys (IndexedDB, async) --
 
@@ -283,13 +284,20 @@ interface PersistedAppLockConfig {
 
 const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     let enabled = localStorage.getItem(lsKeyEnabled) === "true";
-    const lockTypeRaw = localStorage.getItem(lsKeyLockType);
+
+    // Getting the current applock method.
+    const persistedLockType = localStorage.getItem(lsKeyAppLockMethod);
 
     // Remove stale key from removed "hide content when switching apps" setting.
     localStorage.removeItem("appLock.hideContentOnBlur");
 
+    /**
+     * Normalize the persisted lock type value. If an unsupported type is
+     * detected, it will be automatically downgraded to "none" to prevent the
+     * app from being stuck in a stale state.
+     */
     const lockType = normalizeDeviceLockType(
-        normalizeLockType(lockTypeRaw ?? "none"),
+        normalizeLockType(persistedLockType ?? "none"),
     );
 
     if (enabled && lockType === "none") {
@@ -298,9 +306,9 @@ const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     }
 
     if (lockType === "none") {
-        localStorage.removeItem(lsKeyLockType);
-    } else if (lockTypeRaw !== lockType) {
-        localStorage.setItem(lsKeyLockType, lockType);
+        localStorage.removeItem(lsKeyAppLockMethod);
+    } else if (persistedLockType !== lockType) {
+        localStorage.setItem(lsKeyAppLockMethod, lockType);
     }
 
     return {
@@ -624,7 +632,7 @@ const setupPassphraseLock = async (
         resetBruteForceState(true),
     ]);
 
-    localStorage.setItem(lsKeyLockType, lockType);
+    localStorage.setItem(lsKeyAppLockMethod, lockType);
     localStorage.setItem(lsKeyEnabled, "true");
 
     setSnapshot({
@@ -669,7 +677,7 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
 
         await resetBruteForceState(true);
 
-        localStorage.setItem(lsKeyLockType, "device");
+        localStorage.setItem(lsKeyAppLockMethod, "device");
         localStorage.setItem(lsKeyEnabled, "true");
 
         setSnapshot({
@@ -841,9 +849,9 @@ export const lock = () => {
  */
 export const logoutAppLock = async () => {
     localStorage.removeItem(lsKeyEnabled);
-    localStorage.removeItem(lsKeyLockType);
+    localStorage.removeItem(lsKeyAppLockMethod);
     localStorage.removeItem(lsKeyAutoLockTimeMs);
-    localStorage.removeItem(lsKeyDeviceLockEnabled);
+    localStorage.removeItem(lsLegacyKeyDeviceLockEnabled);
 
     await Promise.all([
         clearPassphraseMaterial(),
@@ -882,8 +890,8 @@ export const disableAppLock = async () => {
     ]);
 
     localStorage.setItem(lsKeyEnabled, "false");
-    localStorage.removeItem(lsKeyLockType);
-    localStorage.removeItem(lsKeyDeviceLockEnabled);
+    localStorage.removeItem(lsKeyAppLockMethod);
+    localStorage.removeItem(lsLegacyKeyDeviceLockEnabled);
 
     setSnapshot({
         ..._state.snapshot,

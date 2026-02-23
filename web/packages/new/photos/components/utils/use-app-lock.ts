@@ -15,11 +15,19 @@ import {
  * This is meant to be called once from the top-level `_app.tsx`.
  */
 export const useSetupAppLock = () => {
+    /**
+     * Since we require the Electron safe-storage on the desktop environment, this state variable
+     * initalizes as false on the desktop environment and later after ensuring that refreshAppLockStateFromSession()
+     * is completed transistions into the true.
+     *
+     * Since this safe-storage is not used in the web environment in web environments it's by default true.
+     */
     const [isAppLockReady, setIsAppLockReady] = useState(() => !isDesktop);
 
     useEffect(() => {
         const isElectron = !!globalThis.electron;
-        const isAppLockEnabled = localStorage.getItem("appLock.enabled") === "true";
+        const isAppLockEnabled =
+            localStorage.getItem("appLock.enabled") === "true";
 
         initAppLock();
         if (!isElectron || !isAppLockEnabled) {
@@ -29,8 +37,18 @@ export const useSetupAppLock = () => {
 
         void (async () => {
             try {
+                /**
+                 * The current session's master key might be already existing in the OS's safe
+                 * storage, so if that is foudn then writing it to the browser sessionStorage
+                 *
+                 * Without this the user will have to enter the password again on every launch.
+                 */
                 await updateSessionFromElectronSafeStorageIfNeeded();
             } finally {
+                /**
+                 * The app lock config is actually persisted across sessions, and for refreshing this
+                 * the user must haveMasterKeyInSession().
+                 */
                 refreshAppLockStateFromSession();
                 setIsAppLockReady(true);
             }
@@ -49,22 +67,28 @@ export const useAutoLockWhenBackgrounded = (
     isLocked: AppLockState["isLocked"],
     autoLockTimeMs: AppLockState["autoLockTimeMs"],
 ) => {
-    const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const autoLockDeadlineRef = useRef<number | null>(null);
+    // Holds the current timeout handle for a scheduled auto-lock.
+    const pendingAutoLockTimeoutRef = useRef<ReturnType<
+        typeof setTimeout
+    > | null>(null);
+    // Stores the exact timestamp when auto-lock should happen.
+    const autoLockDueAtTimestampRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!enabled) return;
 
         const clearAutoLockTimer = () => {
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
-                autoLockTimerRef.current = null;
+            if (pendingAutoLockTimeoutRef.current) {
+                clearTimeout(pendingAutoLockTimeoutRef.current);
+                pendingAutoLockTimeoutRef.current = null;
             }
-            autoLockDeadlineRef.current = null;
+            autoLockDueAtTimestampRef.current = null;
         };
 
         const lockIfDeadlineElapsed = () => {
-            const deadline = autoLockDeadlineRef.current;
+            // Return early if the lock deadline has not been reached yet.
+            // If the deadline has passed, clear timer state and lock now.
+            const deadline = autoLockDueAtTimestampRef.current;
             if (deadline === null) return false;
             if (Date.now() < deadline) return false;
 
@@ -73,12 +97,15 @@ export const useAutoLockWhenBackgrounded = (
             return true;
         };
 
+        // Called when the app loses foreground focus (blur/visibility change).
+        // Starts auto-lock unless the app is already locked.
         const startAutoLockTimer = () => {
             if (isLocked) return;
 
             // Avoid extending the countdown when blur + visibility events both
             // fire for a single background transition.
-            const existingDeadline = autoLockDeadlineRef.current;
+
+            const existingDeadline = autoLockDueAtTimestampRef.current;
             if (existingDeadline !== null && Date.now() < existingDeadline) {
                 return;
             }
@@ -89,21 +116,24 @@ export const useAutoLockWhenBackgrounded = (
                 return;
             }
 
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
+            if (pendingAutoLockTimeoutRef.current) {
+                clearTimeout(pendingAutoLockTimeoutRef.current);
             }
-            autoLockDeadlineRef.current = Date.now() + autoLockTimeMs;
-            autoLockTimerRef.current = setTimeout(() => {
-                autoLockDeadlineRef.current = null;
+            autoLockDueAtTimestampRef.current = Date.now() + autoLockTimeMs;
+            pendingAutoLockTimeoutRef.current = setTimeout(() => {
+                autoLockDueAtTimestampRef.current = null;
                 lock();
             }, autoLockTimeMs);
         };
 
+        // On foreground, lock immediately if the deadline passed; otherwise clear pending timer.
         const handleAppForegrounded = () => {
             if (lockIfDeadlineElapsed()) return;
             clearAutoLockTimer();
         };
 
+        // Hidden means backgrounded, so start auto-lock countdown.
+        // Visible means foregrounded, so re-check deadline and clear timer if needed.
         const handleVisibilityChange = () => {
             if (document.hidden) {
                 startAutoLockTimer();
@@ -124,13 +154,16 @@ export const useAutoLockWhenBackgrounded = (
 
         let unsubscribeMainWindowFocus: (() => void) | undefined;
         if (globalThis.electron) {
-            unsubscribeMainWindowFocus =
-                subscribeMainWindowFocus(handleAppForegrounded);
+            unsubscribeMainWindowFocus = subscribeMainWindowFocus(
+                handleAppForegrounded,
+            );
         }
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("blur", handleWindowBlur);
         window.addEventListener("focus", handleWindowFocus);
+
+        // cleanup
         return () => {
             document.removeEventListener(
                 "visibilitychange",
