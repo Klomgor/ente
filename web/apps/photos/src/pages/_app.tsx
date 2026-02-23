@@ -76,6 +76,7 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
     const [isAppLockReady, setIsAppLockReady] = useState(() => !isDesktop);
     const appLock = useAppLockSnapshot();
     const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const autoLockDeadlineRef = useRef<number | null>(null);
 
     const logout = useCallback(() => void photosLogout(), []);
 
@@ -185,48 +186,97 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-lock when the tab/window becomes hidden.
+    // Auto-lock when the tab/window is backgrounded (hidden or unfocused).
     useEffect(() => {
         if (!appLock.enabled) return;
 
-        const handleVisibilityChange = () => {
-            if (document.hidden && !appLock.isLocked) {
-                autoLockTimerRef.current = setTimeout(() => {
-                    lock();
-                }, appLock.autoLockTimeMs);
-            }
-            if (!document.hidden && autoLockTimerRef.current) {
+        const clearAutoLockTimer = () => {
+            if (autoLockTimerRef.current) {
                 clearTimeout(autoLockTimerRef.current);
                 autoLockTimerRef.current = null;
             }
+            autoLockDeadlineRef.current = null;
         };
 
+        const lockIfDeadlineElapsed = () => {
+            const deadline = autoLockDeadlineRef.current;
+            if (deadline === null) return false;
+            if (Date.now() < deadline) return false;
+
+            clearAutoLockTimer();
+            lock();
+            return true;
+        };
+
+        const startAutoLockTimer = () => {
+            if (appLock.isLocked) return;
+
+            // Avoid extending the countdown when blur + visibility events both
+            // fire for a single background transition.
+            const existingDeadline = autoLockDeadlineRef.current;
+            if (existingDeadline !== null && Date.now() < existingDeadline) {
+                return;
+            }
+
+            if (appLock.autoLockTimeMs <= 0) {
+                clearAutoLockTimer();
+                lock();
+                return;
+            }
+
+            if (autoLockTimerRef.current) {
+                clearTimeout(autoLockTimerRef.current);
+            }
+            autoLockDeadlineRef.current = Date.now() + appLock.autoLockTimeMs;
+            autoLockTimerRef.current = setTimeout(() => {
+                autoLockDeadlineRef.current = null;
+                lock();
+            }, appLock.autoLockTimeMs);
+        };
+
+        const handleAppForegrounded = () => {
+            if (lockIfDeadlineElapsed()) return;
+            clearAutoLockTimer();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                startAutoLockTimer();
+            } else {
+                handleAppForegrounded();
+            }
+        };
+
+        const handleWindowBlur = () => {
+            if (!document.hidden) {
+                startAutoLockTimer();
+            }
+        };
+
+        const handleWindowFocus = () => {
+            handleAppForegrounded();
+        };
+
+        let unsubscribeMainWindowFocus: (() => void) | undefined;
+        if (globalThis.electron) {
+            unsubscribeMainWindowFocus =
+                subscribeMainWindowFocus(handleAppForegrounded);
+        }
+
         document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("blur", handleWindowBlur);
+        window.addEventListener("focus", handleWindowFocus);
         return () => {
             document.removeEventListener(
                 "visibilitychange",
                 handleVisibilityChange,
             );
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
-                autoLockTimerRef.current = null;
-            }
+            window.removeEventListener("blur", handleWindowBlur);
+            window.removeEventListener("focus", handleWindowFocus);
+            unsubscribeMainWindowFocus?.();
+            clearAutoLockTimer();
         };
     }, [appLock.enabled, appLock.isLocked, appLock.autoLockTimeMs]);
-
-    // On Electron, clear the auto-lock timer when the main window regains focus.
-    useEffect(() => {
-        if (!appLock.enabled) return;
-
-        const handleFocus = () => {
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
-                autoLockTimerRef.current = null;
-            }
-        };
-
-        return subscribeMainWindowFocus(handleFocus);
-    }, [appLock.enabled]);
 
     const baseContext = useMemo(
         () => deriveBaseContext({ logout, showMiniDialog }),

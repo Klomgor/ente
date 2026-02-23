@@ -24,10 +24,8 @@ import type { NativeDeviceLockCapability } from "ente-base/types/ipc";
 export interface AppLockState {
     /** Whether app lock is enabled. */
     enabled: boolean;
-    /** Active passphrase lock type. */
-    lockType: "pin" | "password" | "none";
-    /** Whether local native device lock is enabled. */
-    deviceLockEnabled: boolean;
+    /** Active lock type. */
+    lockType: "pin" | "password" | "device" | "none";
     /** Whether the app is currently locked. */
     isLocked: boolean;
     /** Consecutive failed attempts in current lockout cycle. */
@@ -41,7 +39,6 @@ export interface AppLockState {
 const createDefaultState = (): AppLockState => ({
     enabled: false,
     lockType: "none",
-    deviceLockEnabled: false,
     isLocked: false,
     invalidAttemptCount: 0,
     cooldownExpiresAt: 0,
@@ -104,8 +101,9 @@ const setSnapshot = (snapshot: AppLockState) => {
 
 const lsKeyEnabled = "appLock.enabled";
 const lsKeyLockType = "appLock.lockType";
-const lsKeyDeviceLockEnabled = "appLock.deviceLockEnabled";
 const lsKeyAutoLockTimeMs = "appLock.autoLockTimeMs";
+// Removed config key from older app-lock implementation; clear it on resets.
+const lsKeyDeviceLockEnabled = "appLock.deviceLockEnabled";
 
 // -- KV DB keys (IndexedDB, async) --
 
@@ -179,7 +177,6 @@ interface AppLockConfigSyncMessage {
     type: "config-updated";
     enabled: AppLockState["enabled"];
     lockType: AppLockState["lockType"];
-    deviceLockEnabled: AppLockState["deviceLockEnabled"];
     autoLockTimeMs: AppLockState["autoLockTimeMs"];
 }
 
@@ -204,7 +201,6 @@ const appLockConfigFromSnapshot = (
 ): Omit<AppLockConfigSyncMessage, "type"> => ({
     enabled: snapshot.enabled,
     lockType: snapshot.lockType,
-    deviceLockEnabled: snapshot.deviceLockEnabled,
     autoLockTimeMs: snapshot.autoLockTimeMs,
 });
 
@@ -261,7 +257,10 @@ const readBruteForceStateFromKV = async () => {
 };
 
 const normalizeLockType = (lockType: string): AppLockState["lockType"] =>
-    lockType === "pin" || lockType === "password" || lockType === "none"
+    lockType === "pin" ||
+    lockType === "password" ||
+    lockType === "device" ||
+    lockType === "none"
         ? lockType
         : "none";
 
@@ -273,49 +272,40 @@ const isDesktopMacOS = () =>
     typeof navigator != "undefined" &&
     navigator.userAgent.toUpperCase().includes("MAC");
 
-const normalizeDeviceLockEnabled = (enabled: boolean) =>
-    isDesktopMacOS() ? enabled : false;
+const normalizeDeviceLockType = (lockType: AppLockState["lockType"]) =>
+    lockType === "device" && !isDesktopMacOS() ? "none" : lockType;
 
 interface PersistedAppLockConfig {
     enabled: boolean;
     lockType: AppLockState["lockType"];
-    deviceLockEnabled: boolean;
     autoLockTimeMs: number;
 }
 
 const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     let enabled = localStorage.getItem(lsKeyEnabled) === "true";
     const lockTypeRaw = localStorage.getItem(lsKeyLockType);
-    const hasLegacyDeviceLockType =
-        lockTypeRaw === "biometric" || lockTypeRaw === "deviceLock";
-    const hasDeviceLockFlag =
-        localStorage.getItem(lsKeyDeviceLockEnabled) === "true";
-
-    if (hasLegacyDeviceLockType) {
-        localStorage.setItem(lsKeyDeviceLockEnabled, "true");
-        localStorage.removeItem(lsKeyLockType);
-    }
 
     // Remove stale key from removed "hide content when switching apps" setting.
     localStorage.removeItem("appLock.hideContentOnBlur");
 
-    const lockType = normalizeLockType(lockTypeRaw ?? "none");
-    const deviceLockEnabled = normalizeDeviceLockEnabled(
-        hasDeviceLockFlag || hasLegacyDeviceLockType,
+    const lockType = normalizeDeviceLockType(
+        normalizeLockType(lockTypeRaw ?? "none"),
     );
 
-    if (!deviceLockEnabled) {
-        localStorage.removeItem(lsKeyDeviceLockEnabled);
-        if (enabled && lockType === "none") {
-            enabled = false;
-            localStorage.setItem(lsKeyEnabled, "false");
-        }
+    if (enabled && lockType === "none") {
+        enabled = false;
+        localStorage.setItem(lsKeyEnabled, "false");
+    }
+
+    if (lockType === "none") {
+        localStorage.removeItem(lsKeyLockType);
+    } else if (lockTypeRaw !== lockType) {
+        localStorage.setItem(lsKeyLockType, lockType);
     }
 
     return {
         enabled,
         lockType,
-        deviceLockEnabled,
         autoLockTimeMs: clampNonNegativeInt(
             Number(localStorage.getItem(lsKeyAutoLockTimeMs) ?? "0"),
         ),
@@ -330,7 +320,6 @@ const setSnapshotFromPersistedConfig = (
         ..._state.snapshot,
         enabled: config.enabled,
         lockType: config.lockType,
-        deviceLockEnabled: config.deviceLockEnabled,
         isLocked,
         autoLockTimeMs: config.autoLockTimeMs,
     });
@@ -400,7 +389,6 @@ if (_channel) {
                         ..._state.snapshot,
                         enabled: false,
                         lockType: "none",
-                        deviceLockEnabled: false,
                         autoLockTimeMs,
                         isLocked: false,
                         invalidAttemptCount: 0,
@@ -413,10 +401,7 @@ if (_channel) {
                 setSnapshot({
                     ..._state.snapshot,
                     enabled: data.enabled,
-                    lockType,
-                    deviceLockEnabled: normalizeDeviceLockEnabled(
-                        data.deviceLockEnabled,
-                    ),
+                    lockType: normalizeDeviceLockType(lockType),
                     autoLockTimeMs,
                 });
                 hydrateBruteForceStateIfNeeded();
@@ -483,7 +468,10 @@ const stopBruteForceStateHydration = () => {
 };
 
 const hydrateBruteForceStateIfNeeded = () => {
-    if (!_state.snapshot.isLocked || _state.snapshot.lockType === "none") {
+    const isPassphraseLock =
+        _state.snapshot.lockType === "pin" ||
+        _state.snapshot.lockType === "password";
+    if (!_state.snapshot.isLocked || !isPassphraseLock) {
         stopBruteForceStateHydration();
         return;
     }
@@ -681,13 +669,13 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
 
         await resetBruteForceState(true);
 
-        localStorage.setItem(lsKeyDeviceLockEnabled, "true");
+        localStorage.setItem(lsKeyLockType, "device");
         localStorage.setItem(lsKeyEnabled, "true");
 
         setSnapshot({
             ..._state.snapshot,
             enabled: true,
-            deviceLockEnabled: true,
+            lockType: "device",
             invalidAttemptCount: 0,
             cooldownExpiresAt: 0,
         });
@@ -756,7 +744,10 @@ export const attemptDeviceLockUnlock =
  * attempts, signals that the caller should force-logout the user.
  */
 export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
-    if (_state.snapshot.lockType === "none") {
+    const isPassphraseLock =
+        _state.snapshot.lockType === "pin" ||
+        _state.snapshot.lockType === "password";
+    if (!isPassphraseLock) {
         return "failed";
     }
 
@@ -851,8 +842,8 @@ export const lock = () => {
 export const logoutAppLock = async () => {
     localStorage.removeItem(lsKeyEnabled);
     localStorage.removeItem(lsKeyLockType);
-    localStorage.removeItem(lsKeyDeviceLockEnabled);
     localStorage.removeItem(lsKeyAutoLockTimeMs);
+    localStorage.removeItem(lsKeyDeviceLockEnabled);
 
     await Promise.all([
         clearPassphraseMaterial(),
@@ -898,7 +889,6 @@ export const disableAppLock = async () => {
         ..._state.snapshot,
         enabled: false,
         lockType: "none",
-        deviceLockEnabled: false,
         isLocked: false,
         invalidAttemptCount: 0,
         cooldownExpiresAt: 0,

@@ -2,7 +2,6 @@ import CheckIcon from "@mui/icons-material/Check";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import {
     DialogActions,
-    Slider,
     Stack,
     TextField,
     Typography,
@@ -205,7 +204,8 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
                                                 }
                                                 disabled={isSettingDeviceLock}
                                                 endIcon={
-                                                    state.deviceLockEnabled ? (
+                                                    state.lockType ===
+                                                    "device" ? (
                                                         <CheckIcon
                                                             sx={{
                                                                 color: "accent.main",
@@ -711,7 +711,7 @@ const PasswordSetupDialog: React.FC<SetupDialogProps> = ({
     );
 };
 
-// -- Auto-Lock Dialog with Slider --
+// -- Auto-Lock Dialog --
 
 interface AutoLockDialogProps {
     open: boolean;
@@ -719,84 +719,44 @@ interface AutoLockDialogProps {
     currentValue: number;
 }
 
-const autoLockMarks = autoLockOptions.map((_, i) => ({ value: i }));
-
 const AutoLockDialog: React.FC<AutoLockDialogProps> = ({
     open,
     onClose,
     currentValue,
 }) => {
-    const persistedIndex = autoLockOptions.findIndex(
-        (o) => o.ms === currentValue,
-    );
-    const defaultIndex = persistedIndex === -1 ? 0 : persistedIndex;
-    const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
-
-    useEffect(() => {
-        if (!open) return;
-        setSelectedIndex(defaultIndex);
-    }, [open, defaultIndex]);
-
-    const handleChange = (_: Event, newValue: number | number[]) => {
-        setSelectedIndex(newValue as number);
-    };
-
-    const handleChangeCommitted = (
-        _: Event | React.SyntheticEvent,
-        newValue: number | number[],
-    ) => {
-        const index = newValue as number;
-        const option = autoLockOptions[index];
-        if (option) setAutoLockTime(option.ms);
-    };
-
-    const firstLabel = t(autoLockOptions[0]!.labelKey);
-    const lastLabel = t(autoLockOptions[autoLockOptions.length - 1]!.labelKey);
-    const selectedOption =
-        autoLockOptions[selectedIndex] ?? autoLockOptions[0]!;
+    const selectedMs = autoLockOptions.some((o) => o.ms === currentValue)
+        ? currentValue
+        : autoLockOptions[0]!.ms;
 
     return (
         <TitledMiniDialog open={open} onClose={onClose} title={t("auto_lock")}>
-            <Stack sx={{ gap: 2, py: 1 }}>
-                <Typography
-                    variant="small"
-                    color="accent.main"
-                    textAlign="center"
-                >
-                    {t(selectedOption.labelKey)}
-                </Typography>
-                <Stack sx={{ px: 1 }}>
-                    <Slider
-                        value={selectedIndex}
-                        min={0}
-                        max={autoLockOptions.length - 1}
-                        step={null}
-                        marks={autoLockMarks}
-                        onChange={handleChange}
-                        onChangeCommitted={handleChangeCommitted}
-                        sx={{
-                            color: "accent.main",
-                            "& .MuiSlider-markActive": {
-                                backgroundColor: "accent.main",
-                            },
-                        }}
-                    />
-                    <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        sx={{ mt: -0.5 }}
-                    >
-                        <Typography variant="mini" color="text.faint">
-                            {firstLabel}
-                        </Typography>
-                        <Typography variant="mini" color="text.faint">
-                            {lastLabel}
-                        </Typography>
-                    </Stack>
-                </Stack>
+            <Stack sx={{ gap: 1.25, pt: 0.25, pb: 0.5, mt: -0.75 }}>
+                <RowButtonGroup>
+                    {autoLockOptions.map((option, index) => (
+                        <React.Fragment key={option.ms}>
+                            {index > 0 && <RowButtonDivider />}
+                            <RowButton
+                                label={t(option.labelKey)}
+                                endIcon={
+                                    selectedMs === option.ms ? (
+                                        <CheckIcon
+                                            sx={{ color: "accent.main" }}
+                                        />
+                                    ) : undefined
+                                }
+                                onClick={() => setAutoLockTime(option.ms)}
+                            />
+                        </React.Fragment>
+                    ))}
+                </RowButtonGroup>
             </Stack>
-            <DialogActions>
-                <FocusVisibleButton fullWidth color="accent" onClick={onClose}>
+            <DialogActions sx={{ px: 0, mx: "-16px", pt: 0.75, pb: 0 }}>
+                <FocusVisibleButton
+                    fullWidth
+                    color="accent"
+                    sx={{ minHeight: 48 }}
+                    onClick={onClose}
+                >
                     {t("done")}
                 </FocusVisibleButton>
             </DialogActions>
