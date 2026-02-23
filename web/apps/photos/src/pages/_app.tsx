@@ -24,10 +24,8 @@ import {
 } from "ente-base/components/utils/hooks-app";
 import { photosTheme } from "ente-base/components/utils/theme";
 import { BaseContext, deriveBaseContext } from "ente-base/context";
-import { subscribeMainWindowFocus } from "ente-base/electron";
 import log from "ente-base/log";
 import { logStartupBanner } from "ente-base/log-web";
-import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
 import type { AppUpdate } from "ente-base/types/ipc";
 import {
     initVideoProcessing,
@@ -40,13 +38,12 @@ import {
     updateAvailableForDownloadDialogAttributes,
     updateReadyToInstallDialogAttributes,
 } from "ente-new/photos/components/utils/download";
+import {
+    useAutoLockWhenBackgrounded,
+    useSetupAppLock,
+} from "ente-new/photos/components/utils/use-app-lock";
 import { useLoadingBar } from "ente-new/photos/components/utils/use-loading-bar";
 import { useAppLockSnapshot } from "ente-new/photos/components/utils/use-snapshot";
-import {
-    initAppLock,
-    lock,
-    refreshAppLockStateFromSession,
-} from "ente-new/photos/services/app-lock";
 import { resumeExportsIfNeeded } from "ente-new/photos/services/export";
 import { runMigrations } from "ente-new/photos/services/migration";
 import { initML, isMLSupported } from "ente-new/photos/services/ml";
@@ -55,7 +52,7 @@ import { PhotosAppContext } from "ente-new/photos/types/context";
 import { t } from "i18next";
 import type { AppProps } from "next/app";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { photosLogout } from "services/logout";
 
 import "photoswipe/dist/photoswipe.css";
@@ -73,32 +70,18 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
     const { loadingBarRef, showLoadingBar, hideLoadingBar } = useLoadingBar();
 
     const [watchFolderView, setWatchFolderView] = useState(false);
-    const [isAppLockReady, setIsAppLockReady] = useState(() => !isDesktop);
+    const isAppLockReady = useSetupAppLock();
     const appLock = useAppLockSnapshot();
-    const autoLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const autoLockDeadlineRef = useRef<number | null>(null);
+    useAutoLockWhenBackgrounded(
+        appLock.enabled,
+        appLock.isLocked,
+        appLock.autoLockTimeMs,
+    );
 
     const logout = useCallback(() => void photosLogout(), []);
 
     useEffect(() => {
         logStartupBanner(savedLocalUser()?.id);
-        const isElectron = !!globalThis.electron;
-        const isAppLockEnabled =
-            localStorage.getItem("appLock.enabled") === "true";
-
-        initAppLock();
-        if (!isElectron || !isAppLockEnabled) {
-            setIsAppLockReady(true);
-        }
-        void (async () => {
-            if (!isElectron || !isAppLockEnabled) return;
-            try {
-                await updateSessionFromElectronSafeStorageIfNeeded();
-            } finally {
-                refreshAppLockStateFromSession();
-                setIsAppLockReady(true);
-            }
-        })();
         void isLocalStorageAndIndexedDBMismatch().then((mismatch) => {
             if (mismatch) {
                 log.error("Logging out (IndexedDB and local storage mismatch)");
@@ -185,98 +168,6 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         // TODO:
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    // Auto-lock when the tab/window is backgrounded (hidden or unfocused).
-    useEffect(() => {
-        if (!appLock.enabled) return;
-
-        const clearAutoLockTimer = () => {
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
-                autoLockTimerRef.current = null;
-            }
-            autoLockDeadlineRef.current = null;
-        };
-
-        const lockIfDeadlineElapsed = () => {
-            const deadline = autoLockDeadlineRef.current;
-            if (deadline === null) return false;
-            if (Date.now() < deadline) return false;
-
-            clearAutoLockTimer();
-            lock();
-            return true;
-        };
-
-        const startAutoLockTimer = () => {
-            if (appLock.isLocked) return;
-
-            // Avoid extending the countdown when blur + visibility events both
-            // fire for a single background transition.
-            const existingDeadline = autoLockDeadlineRef.current;
-            if (existingDeadline !== null && Date.now() < existingDeadline) {
-                return;
-            }
-
-            if (appLock.autoLockTimeMs <= 0) {
-                clearAutoLockTimer();
-                lock();
-                return;
-            }
-
-            if (autoLockTimerRef.current) {
-                clearTimeout(autoLockTimerRef.current);
-            }
-            autoLockDeadlineRef.current = Date.now() + appLock.autoLockTimeMs;
-            autoLockTimerRef.current = setTimeout(() => {
-                autoLockDeadlineRef.current = null;
-                lock();
-            }, appLock.autoLockTimeMs);
-        };
-
-        const handleAppForegrounded = () => {
-            if (lockIfDeadlineElapsed()) return;
-            clearAutoLockTimer();
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                startAutoLockTimer();
-            } else {
-                handleAppForegrounded();
-            }
-        };
-
-        const handleWindowBlur = () => {
-            if (!document.hidden) {
-                startAutoLockTimer();
-            }
-        };
-
-        const handleWindowFocus = () => {
-            handleAppForegrounded();
-        };
-
-        let unsubscribeMainWindowFocus: (() => void) | undefined;
-        if (globalThis.electron) {
-            unsubscribeMainWindowFocus =
-                subscribeMainWindowFocus(handleAppForegrounded);
-        }
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        window.addEventListener("blur", handleWindowBlur);
-        window.addEventListener("focus", handleWindowFocus);
-        return () => {
-            document.removeEventListener(
-                "visibilitychange",
-                handleVisibilityChange,
-            );
-            window.removeEventListener("blur", handleWindowBlur);
-            window.removeEventListener("focus", handleWindowFocus);
-            unsubscribeMainWindowFocus?.();
-            clearAutoLockTimer();
-        };
-    }, [appLock.enabled, appLock.isLocked, appLock.autoLockTimeMs]);
 
     const baseContext = useMemo(
         () => deriveBaseContext({ logout, showMiniDialog }),
