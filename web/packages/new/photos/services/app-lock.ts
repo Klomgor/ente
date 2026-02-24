@@ -546,15 +546,6 @@ const resolveDeviceLockCapability = async (): Promise<DeviceLockCapability> => {
 };
 
 /**
- * Return true if the current environment supports native device lock app
- * unlocks.
- */
-export const isDeviceLockSupported = async () => {
-    const capability = await resolveDeviceLockCapability();
-    return capability.usable;
-};
-
-/**
  * Return true if the current environment should show "Device lock" in the
  * lock-type picker.
  *
@@ -774,6 +765,10 @@ export const attemptDeviceLockUnlock =
  * attempts, signals that the caller should force-logout the user.
  */
 export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
+    /**
+     * This flow applies only to PIN and password locks.
+     * Guard against being called for any other lock type.
+     */
     const isPassphraseLock =
         _state.snapshot.lockType === "pin" ||
         _state.snapshot.lockType === "password";
@@ -785,7 +780,12 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
         // Ensure persisted lockout state has been rehydrated before enforcing.
         await ensureBruteForceStateHydrated();
 
-        // Refresh lockout state from KV so stale tabs cannot reset counters.
+        /**
+         * Refresh lockout state from KV so stale tabs cannot reset counters.
+         *
+         * If multiple tabs attempt to unlock at the same time, sync from KV DB
+         * before validation so all tabs use the latest attempt/cooldown state.
+         */
         const persistedState = await readBruteForceStateFromKV();
         const invalidAttemptCount = Math.max(
             _state.snapshot.invalidAttemptCount,
@@ -795,6 +795,8 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
             _state.snapshot.cooldownExpiresAt,
             persistedState.cooldownExpiresAt,
         );
+
+        // Update the snapshot with the latest values.
         setBruteForceSnapshot(invalidAttemptCount, cooldownExpiresAt);
 
         // Check cooldown from in-memory state.

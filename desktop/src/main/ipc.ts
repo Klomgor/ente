@@ -29,7 +29,6 @@ import {
 import autoLauncher from "./services/auto-launcher";
 import {
     getNativeDeviceLockCapability,
-    isDeviceLockSupported,
     promptDeviceLock,
 } from "./services/device-lock";
 import {
@@ -144,10 +143,6 @@ export const attachIPCHandlers = () => {
     ipcMain.handle("getNativeDeviceLockCapability", () =>
         getNativeDeviceLockCapability(),
     );
-
-    // Returns a simple yes/no for whether native device lock can be used on
-    // this machine. Useful for quick feature gating in settings.
-    ipcMain.handle("isDeviceLockSupported", () => isDeviceLockSupported());
 
     // Triggers the OS-native authentication prompt (Touch ID / Windows Hello /
     // etc.) and returns the auth result back to the renderer.

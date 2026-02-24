@@ -133,8 +133,6 @@ const toggleAutoLaunch = () => ipcRenderer.invoke("toggleAutoLaunch");
 const getNativeDeviceLockCapability = (): Promise<NativeDeviceLockCapability> =>
     ipcRenderer.invoke("getNativeDeviceLockCapability");
 
-const isDeviceLockSupported = () => ipcRenderer.invoke("isDeviceLockSupported");
-
 const minDeviceLockPromptIntervalMs = 1_500;
 let lastDeviceLockPromptTimeMs = 0;
 
@@ -389,7 +387,6 @@ contextBridge.exposeInMainWorld("electron", {
     isAutoLaunchEnabled,
     toggleAutoLaunch,
     getNativeDeviceLockCapability,
-    isDeviceLockSupported,
     promptDeviceLock,
     onMainWindowFocus,
     onOpenEnteURL,

@@ -42,14 +42,6 @@ export const getNativeDeviceLockCapability = (): NativeDeviceLockCapability => {
 };
 
 /**
- * Legacy compatibility helper used by older renderer flows.
- *
- * Prefer {@link getNativeDeviceLockCapability}.
- */
-export const isDeviceLockSupported = () =>
-    getNativeDeviceLockCapability().available;
-
-/**
  * Prompt the user to unlock using native device authentication.
  *
  * Returns true on successful authentication. Returns false if unavailable,

@@ -172,6 +172,11 @@ const AppLockCard: React.FC<React.PropsWithChildren> = ({ children }) => (
 
 /**
  * Format remaining cooldown seconds into a human-readable string.
+ *
+ * Input is in milliseconds, so convert it to minutes and seconds for display.
+ *
+ *  - "Xm Ys" if at least 1 minute
+ *  - "Xs" if under a minute
  */
 const formatCooldown = (remainingMs: number): string => {
     const totalSeconds = Math.ceil(remainingMs / 1000);
@@ -181,6 +186,18 @@ const formatCooldown = (remainingMs: number): string => {
         return `${String(minutes)}m ${String(seconds)}s`;
     }
     return `${String(seconds)}s`;
+};
+
+/**
+ * Move the caret to the end of the current input value.
+ */
+const moveCaretToInputEnd = (input: HTMLInputElement) => {
+    try {
+        const caretPosition = input.value.length;
+        input.setSelectionRange(caretPosition, caretPosition);
+    } catch {
+        // Ignore if selection range isn't supported.
+    }
 };
 
 /**
@@ -276,16 +293,18 @@ const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
     );
 
     const fullPin = useMemo(() => pin.join(""), [pin]);
-    const focusPinInput = useCallback((index: number) => {
-        const input = inputRefs.current[index];
-        if (!input) return;
-        input.focus({ preventScroll: true });
-        try {
-            const pos = input.value.length;
-            input.setSelectionRange(pos, pos);
-        } catch {
-            // Ignore if selection range isn't supported.
+
+    /**
+     * Focus the PIN field at the given index, then place the caret at the end.
+     */
+    const focusPinInput = useCallback((pinIndex: number) => {
+        const input = inputRefs.current[pinIndex];
+        if (!input) {
+            return;
         }
+
+        input.focus({ preventScroll: true });
+        moveCaretToInputEnd(input);
     }, []);
     const focusFirstEmptyPinInput = useCallback(() => {
         const firstEmptyIndex = pin.findIndex((digit) => !digit);
@@ -298,6 +317,11 @@ const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
         setLoading(true);
         try {
             const result: UnlockResult = await attemptUnlock(fullPin);
+
+            /**
+             * The result can be "success", "failed", "cooldown", or "logout".
+             * Apply the corresponding UI updates for each case.
+             */
             handleUnlockResult(result, setError, setLoading, logout);
         } catch (e) {
             log.error("Unlock attempt failed", e);
@@ -305,7 +329,7 @@ const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
             setLoading(false);
         }
 
-        // Clear PIN on any non-success.
+        // Clear PIN after each attempt and refocus the first field.
         setPin(["", "", "", ""]);
         focusPinInput(0);
     }, [fullPin, loading, logout, focusPinInput]);
@@ -681,14 +705,6 @@ const CooldownScreen: React.FC<CooldownScreenProps> = ({
         durationMs > 0
             ? Math.min(100, ((durationMs - remainingMs) / durationMs) * 100)
             : 0;
-    const nextAttemptCount = attemptCount + 1;
-    const nextCooldownMs = appLockCooldownDurationMs(nextAttemptCount);
-    const nextAttemptMessage =
-        nextAttemptCount >= 10
-            ? t("one_more_wrong_attempt_logout")
-            : t("next_wrong_attempt_wait", {
-                  time: formatCooldown(nextCooldownMs),
-              });
 
     return (
         <Stack
@@ -748,19 +764,6 @@ const CooldownScreen: React.FC<CooldownScreenProps> = ({
             <Typography variant="small" color="text.muted" textAlign="center">
                 {t("wrong_unlock_code", { count: attemptCount })}
             </Typography>
-            <Typography
-                variant="mini"
-                color="text.muted"
-                textAlign="center"
-                sx={{
-                    width: "100%",
-                    pt: 0.75,
-                    borderTop: "1px solid var(--mui-palette-divider)",
-                    opacity: 0.9,
-                }}
-            >
-                {nextAttemptMessage}
-            </Typography>
             <FocusVisibleButton
                 fullWidth
                 color="secondary"
@@ -786,9 +789,6 @@ const handleUnlockResult = (
 ) => {
     switch (result) {
         case "success":
-            setError(undefined);
-            setLoading(false);
-            break;
         case "cooldown":
             setError(undefined);
             setLoading(false);
