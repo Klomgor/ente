@@ -435,10 +435,17 @@ if (_channel) {
         const data = event.data as AppLockChannelMessage;
 
         switch (data.type) {
-            case "lock":
+            case "lock": {
+                const shouldIgnoreLockMessage =
+                    !_state.snapshot.enabled || _state.snapshot.lockType === "none";
+                if (shouldIgnoreLockMessage) {
+                    break;
+                }
+
                 setSnapshot({ ..._state.snapshot, isLocked: true });
                 hydrateBruteForceStateIfNeeded();
                 break;
+            }
             case "unlock":
                 setSnapshot({
                     ..._state.snapshot,
