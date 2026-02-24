@@ -322,15 +322,32 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
     onClose,
     onComplete,
 }) => {
+    // For PIN setup, there are two modals: one for initial input and one for confirmation.
     const [step, setStep] = useState<"enter" | "confirm">("enter");
+    // Stores the 4 PIN digits entered by the user
     const [pin, setPin] = useState(["", "", "", ""]);
+    // Stores the 4 PIN digits entered for confirmation
     const [confirmPin, setConfirmPin] = useState(["", "", "", ""]);
+    // Stores error message if PIN confirmation fails
     const [error, setError] = useState("");
 
+    // DOM refs for the 4 PIN inputs in the "enter PIN" step.
+    // We keep these refs so the component can imperatively move focus between
+    // single-character fields (auto-advance on digit entry, move back on
+    // Backspace, and return focus to the first field when switching steps).
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    // DOM refs for the 4 PIN inputs in the "confirm PIN" step.
     const confirmInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    // Tracks pending delayed focus so we can cancel stale timers safely.
     const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    /**
+     * queueFocus clears any existing timer and schedules a new focus callback
+     * with setTimeout(fn, delay).
+     *
+     * When steps change, inputs are remounted, so an immediate .focus() can
+     * run too early. This helper waits briefly, then focuses the correct field.
+     */
     const queueFocus = useCallback((fn: () => void, delay: number) => {
         if (focusTimerRef.current) {
             clearTimeout(focusTimerRef.current);
@@ -338,15 +355,15 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         focusTimerRef.current = setTimeout(fn, delay);
     }, []);
 
-    useEffect(
-        () => () => {
+    // Cleanup function to clear the focusTimer when the component unmounts.
+    useEffect(() => {
+        return () => {
             if (focusTimerRef.current) {
                 clearTimeout(focusTimerRef.current);
                 focusTimerRef.current = null;
             }
-        },
-        [],
-    );
+        };
+    }, []);
 
     const resetState = useCallback(() => {
         setStep("enter");
@@ -360,16 +377,26 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         onClose();
     }, [resetState, onClose]);
 
+    // Sanitize input, write a digit, move focus forward, and reset the error.
     const handlePinDigitChange = (
         index: number,
         value: string,
         isConfirm: boolean,
     ) => {
+        // Removes every non-digit character and keeps only the last digit.
         const digit = value.replace(/\D/g, "").slice(-1);
+
+        /**
+         * If the confirmation step is active, update the confirmPin state;
+         * otherwise, update the pin state.
+         */
+
         if (isConfirm) {
             const next = [...confirmPin];
             next[index] = digit;
             setConfirmPin(next);
+
+            // If it's not the last index, advance focus automatically.
             if (digit && index < 3) {
                 confirmInputRefs.current[index + 1]?.focus();
             }
@@ -384,6 +411,11 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         setError("");
     };
 
+    /**
+     * Invoked on keypress. If the key is Backspace, use the active PIN array
+     * and, when the current box is empty and not the first one, move focus to
+     * the previous input.
+     */
     const handlePinKeyDown = (
         index: number,
         e: React.KeyboardEvent,
@@ -398,12 +430,20 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
         }
     };
 
+    /**
+     * Invoked when the next button is pressed on the first step,
+     * checks if all digits are present, and proceeds to the confirm step.
+     */
     const handleNext = useCallback(() => {
         if (pin.some((d) => !d)) return;
         setStep("confirm");
         queueFocus(() => confirmInputRefs.current[0]?.focus(), 50);
     }, [pin, queueFocus]);
 
+    /**
+     * If Back is pressed in the confirmation step, reset the
+     * confirmation array and switch to the entry step.
+     */
     const handleBack = useCallback(() => {
         setStep("enter");
         setConfirmPin(["", "", "", ""]);
@@ -569,15 +609,14 @@ const PasswordSetupDialog: React.FC<SetupDialogProps> = ({
         focusTimerRef.current = setTimeout(fn, delay);
     }, []);
 
-    useEffect(
-        () => () => {
+    useEffect(() => {
+        return () => {
             if (focusTimerRef.current) {
                 clearTimeout(focusTimerRef.current);
                 focusTimerRef.current = null;
             }
-        },
-        [],
-    );
+        };
+    }, []);
 
     useEffect(() => {
         if (open) {
