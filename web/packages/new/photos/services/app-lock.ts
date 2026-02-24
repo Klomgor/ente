@@ -169,10 +169,19 @@ export const appLockCooldownDurationMs = (attemptCount: number): number => {
 
 // -- BroadcastChannel for multi-tab sync --
 
-const _channel =
-    typeof BroadcastChannel != "undefined"
-        ? new BroadcastChannel("ente-app-lock")
-        : undefined;
+const createAppLockChannel = () => {
+    if (typeof BroadcastChannel == "undefined") return undefined;
+
+    try {
+        return new BroadcastChannel("ente-app-lock");
+    } catch (error) {
+        // Some runtimes expose BroadcastChannel but block construction.
+        log.warn("BroadcastChannel unavailable for app lock sync", { error });
+        return undefined;
+    }
+};
+
+const _channel = createAppLockChannel();
 
 interface AppLockConfigSyncMessage {
     type: "config-updated";
