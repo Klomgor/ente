@@ -13,7 +13,10 @@ import { deriveInteractiveKey, deriveKey } from "ente-base/crypto";
 import { getKVN, getKVS, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { haveMasterKeyInSession } from "ente-base/session";
-import type { NativeDeviceLockCapability } from "ente-base/types/ipc";
+import type {
+    NativeDeviceLockCapability,
+    NativeDeviceLockUnavailableReason,
+} from "ente-base/types/ipc";
 
 /**
  * In-memory state for the app lock feature.
@@ -74,7 +77,11 @@ let _bruteForceStateHydration = Promise.resolve();
 let _bruteForceStateHydrationGeneration = 0;
 
 /**
- * A function that can be used to subscribe to updates to {@link AppLockState}.
+ * Subscribe to updates to {@link AppLockState}.
+ *
+ * The callback is invoked whenever {@link setSnapshot} updates
+ * {@link _state.snapshot}. Returns an unsubscribe function that removes the
+ * callback from the listener list.
  *
  * See: [Note: Snapshots and useSyncExternalStore].
  */
@@ -92,19 +99,27 @@ export const appLockSubscribe = (onChange: () => void): (() => void) => {
  */
 export const appLockSnapshot = () => _state.snapshot;
 
+/**
+ * Update the internal app lock state snapshot and notify all subscribers.
+ *
+ * This is the single source of truth for state updates. All modifications to
+ * _state.snapshot must go through this function to ensure subscribers are
+ * properly notified of changes.
+ *
+ * See: [Note: Snapshots and useSyncExternalStore].
+ */
 const setSnapshot = (snapshot: AppLockState) => {
     _state.snapshot = snapshot;
     _state.listeners.forEach((l) => l());
 };
 
 // -- localStorage keys (synchronous, for cold-start reads) --
+// lsKey => localStorageKey
 
 const lsKeyEnabled = "appLock.enabled";
 // Stores the selected app-lock method ("pin" | "password" | "device" | "none").
 const lsKeyAppLockMethod = "appLock.lockType";
 const lsKeyAutoLockTimeMs = "appLock.autoLockTimeMs";
-// Removed config key from older app-lock implementation; clear it on resets.
-const lsLegacyKeyDeviceLockEnabled = "appLock.deviceLockEnabled";
 
 // -- KV DB keys (IndexedDB, async) --
 
@@ -126,37 +141,32 @@ const unlockAttemptLockName = "ente-app-lock-unlock-attempt";
 
 export type DeviceLockMode = "native";
 
-export type DeviceLockUnsupportedReason =
-    | "unsupported-platform"
-    | "touchid-not-enrolled"
-    | "touchid-api-error";
-
 export type DeviceLockFailureReason = "native-prompt-failed" | "unknown";
 
-const logDeviceLockUnsupported = (
+const logDeviceLockEvent = (
     phase: "setup" | "unlock",
-    reason: DeviceLockUnsupportedReason,
-) => {
-    log.warn(`Device lock ${phase} is not supported`, { reason });
-};
-
-const logDeviceLockFailure = (
-    phase: "setup" | "unlock",
-    reason: DeviceLockFailureReason,
+    status: "not-supported" | "failed",
+    reason: NativeDeviceLockUnavailableReason | DeviceLockFailureReason,
     error?: unknown,
 ) => {
+    const message =
+        status === "not-supported"
+            ? `Device lock ${phase} is not supported`
+            : `Device lock ${phase} failed`;
+
     if (typeof error != "undefined") {
-        log.warn(`Device lock ${phase} failed`, { reason, error });
+        log.warn(message, { reason, error });
         return;
     }
 
-    log.warn(`Device lock ${phase} failed`, { reason });
+    log.warn(message, { reason });
 };
 
 /**
  * Return the cooldown duration for a failed-attempt count.
  *
- * This policy is shared by both lockout enforcement and cooldown UI.
+ * This policy is shared by lockout enforcement and cooldown UI (used by
+ * AppLockOverlay to render countdown progress).
  */
 export const appLockCooldownDurationMs = (attemptCount: number): number => {
     if (attemptCount < cooldownStartsAtAttempt) return 0;
@@ -168,6 +178,13 @@ export const appLockCooldownDurationMs = (attemptCount: number): number => {
 };
 
 // -- BroadcastChannel for multi-tab sync --
+
+/**
+ * Create the BroadcastChannel used to sync app-lock state across tabs/windows.
+ *
+ * Returns `undefined` when BroadcastChannel is unavailable or blocked in the
+ * current runtime.
+ */
 
 const createAppLockChannel = () => {
     if (typeof BroadcastChannel == "undefined") return undefined;
@@ -181,8 +198,16 @@ const createAppLockChannel = () => {
     }
 };
 
+// BroadcastChannel instance used for cross-tab sync.
 const _channel = createAppLockChannel();
 
+/**
+ * Message types broadcast over the app-lock channel:
+ *
+ * - `config-updated`: app-lock settings changed.
+ * - `bruteforce-updated`: failed-attempt/cooldown state changed.
+ * - `lock` / `unlock`: lock status changed in another tab/window.
+ */
 interface AppLockConfigSyncMessage {
     type: "config-updated";
     enabled: AppLockState["enabled"];
@@ -202,10 +227,14 @@ type AppLockChannelMessage =
     | AppLockConfigSyncMessage
     | AppLockBruteForceSyncMessage;
 
+/** Broadcast an app-lock sync message to other tabs/windows. */
 const postChannelMessage = (payload: AppLockChannelMessage) => {
     _channel?.postMessage(payload);
 };
 
+/**
+ * Extract only the app-lock config fields needed for cross-tab sync.
+ */
 const appLockConfigFromSnapshot = (
     snapshot: AppLockState,
 ): Omit<AppLockConfigSyncMessage, "type"> => ({
@@ -214,6 +243,9 @@ const appLockConfigFromSnapshot = (
     autoLockTimeMs: snapshot.autoLockTimeMs,
 });
 
+/**
+ * Broadcast the current app-lock config to other tabs/windows.
+ */
 const syncConfigAcrossTabs = (snapshot: AppLockState) => {
     const payload: AppLockConfigSyncMessage = {
         type: "config-updated",
@@ -222,6 +254,9 @@ const syncConfigAcrossTabs = (snapshot: AppLockState) => {
     postChannelMessage(payload);
 };
 
+/**
+ * Broadcast brute-force state to other tabs/windows.
+ */
 const syncBruteForceAcrossTabs = (
     invalidAttemptCount: number,
     cooldownExpiresAt: number,
@@ -234,6 +269,12 @@ const syncBruteForceAcrossTabs = (
     postChannelMessage(payload);
 };
 
+/**
+ * Update brute-force values in the in-memory snapshot and optionally broadcast.
+ *
+ * Updates the snapshot only when values change, then syncs to other tabs when
+ * `shouldBroadcast` is true.
+ */
 const setBruteForceSnapshot = (
     invalidAttemptCount: number,
     cooldownExpiresAt: number,
@@ -266,14 +307,6 @@ const readBruteForceStateFromKV = async () => {
     };
 };
 
-const normalizeLockType = (lockType: string): AppLockState["lockType"] =>
-    lockType === "pin" ||
-    lockType === "password" ||
-    lockType === "device" ||
-    lockType === "none"
-        ? lockType
-        : "none";
-
 const clampNonNegativeInt = (value: number) =>
     Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 
@@ -285,6 +318,11 @@ const isDesktopMacOS = () =>
 const normalizeDeviceLockType = (lockType: AppLockState["lockType"]) =>
     lockType === "device" && !isDesktopMacOS() ? "none" : lockType;
 
+/**
+ * Shape of app-lock settings persisted in localStorage.
+ *
+ * Used to initialize or refresh the in-memory snapshot.
+ */
 interface PersistedAppLockConfig {
     enabled: boolean;
     lockType: AppLockState["lockType"];
@@ -294,20 +332,13 @@ interface PersistedAppLockConfig {
 const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     let enabled = localStorage.getItem(lsKeyEnabled) === "true";
 
-    // Getting the current applock method.
-    const persistedLockType = localStorage.getItem(lsKeyAppLockMethod);
+    // Read the currently persisted app-lock method.
+    const persistedLockType = localStorage.getItem(lsKeyAppLockMethod) as
+        | AppLockState["lockType"]
+        | null;
 
-    // Remove stale key from removed "hide content when switching apps" setting.
-    localStorage.removeItem("appLock.hideContentOnBlur");
-
-    /**
-     * Normalize the persisted lock type value. If an unsupported type is
-     * detected, it will be automatically downgraded to "none" to prevent the
-     * app from being stuck in a stale state.
-     */
-    const lockType = normalizeDeviceLockType(
-        normalizeLockType(persistedLockType ?? "none"),
-    );
+    // Coerce missing values to "none" and gate "device" to supported platforms.
+    const lockType = normalizeDeviceLockType(persistedLockType ?? "none");
 
     if (enabled && lockType === "none") {
         enabled = false;
@@ -329,6 +360,12 @@ const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     };
 };
 
+/**
+ * Update in-memory app-lock state from persisted config.
+ *
+ * Used during `initAppLock` (cold start) and
+ * `refreshAppLockStateFromSession` (after session restore).
+ */
 const setSnapshotFromPersistedConfig = (
     config: PersistedAppLockConfig,
     isLocked: boolean,
@@ -345,6 +382,11 @@ const setSnapshotFromPersistedConfig = (
 
 let _localUnlockAttemptQueue = Promise.resolve();
 
+/**
+ * Serialize unlock attempts within the current tab.
+ *
+ * This fallback mutex is used when the Web Locks API is unavailable.
+ */
 const withLocalUnlockAttemptLock = async <T>(fn: () => Promise<T>) => {
     const previous = _localUnlockAttemptQueue;
     let releaseCurrent: (() => void) | undefined;
@@ -361,6 +403,12 @@ const withLocalUnlockAttemptLock = async <T>(fn: () => Promise<T>) => {
     }
 };
 
+/**
+ * Serialize unlock attempts across tabs when possible.
+ *
+ * Uses the Web Locks API for cross-tab mutual exclusion, and falls back to
+ * {@link withLocalUnlockAttemptLock} when unavailable.
+ */
 const withUnlockAttemptLock = async <T>(fn: () => Promise<T>) => {
     const locks =
         typeof navigator == "undefined"
@@ -379,6 +427,9 @@ const withUnlockAttemptLock = async <T>(fn: () => Promise<T>) => {
     return withLocalUnlockAttemptLock(fn);
 };
 
+/**
+ * Handle app-lock sync messages from other tabs/windows.
+ */
 if (_channel) {
     _channel.onmessage = (event: MessageEvent) => {
         const data = event.data as AppLockChannelMessage;
@@ -398,7 +449,6 @@ if (_channel) {
                 stopBruteForceStateHydration();
                 break;
             case "config-updated": {
-                const lockType = normalizeLockType(data.lockType);
                 const autoLockTimeMs = clampNonNegativeInt(data.autoLockTimeMs);
 
                 if (!data.enabled) {
@@ -418,7 +468,7 @@ if (_channel) {
                 setSnapshot({
                     ..._state.snapshot,
                     enabled: data.enabled,
-                    lockType: normalizeDeviceLockType(lockType),
+                    lockType: normalizeDeviceLockType(data.lockType),
                     autoLockTimeMs,
                 });
                 hydrateBruteForceStateIfNeeded();
@@ -530,11 +580,11 @@ const nativeDeviceLockCapability =
 
 type DeviceLockCapability =
     | { usable: true; mode: DeviceLockMode }
-    | { usable: false; reason: DeviceLockUnsupportedReason };
+    | { usable: false; reason: NativeDeviceLockUnavailableReason };
 
 const nativeCapabilityUnavailableReason = (
     capability: NativeDeviceLockCapability,
-): DeviceLockUnsupportedReason => {
+): NativeDeviceLockUnavailableReason => {
     switch (capability.reason) {
         case "touchid-not-enrolled":
         case "touchid-api-error":
@@ -621,7 +671,7 @@ export const refreshAppLockStateFromSession = () => {
  */
 export type SetupDeviceLockResult =
     | { status: "success"; mode: DeviceLockMode }
-    | { status: "not-supported"; reason: DeviceLockUnsupportedReason }
+    | { status: "not-supported"; reason: NativeDeviceLockUnavailableReason }
     | { status: "failed"; reason: DeviceLockFailureReason };
 
 /**
@@ -678,7 +728,7 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
 
     // Surface unsupported reasons to callers/UI.
     if (!capability.usable) {
-        logDeviceLockUnsupported("setup", capability.reason);
+        logDeviceLockEvent("setup", "not-supported", capability.reason);
         return { status: "not-supported", reason: capability.reason };
     }
 
@@ -688,7 +738,7 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
             deviceLockEnablePromptReason,
         );
         if (!unlocked) {
-            logDeviceLockFailure("setup", "native-prompt-failed");
+            logDeviceLockEvent("setup", "failed", "native-prompt-failed");
             return { status: "failed", reason: "native-prompt-failed" };
         }
 
@@ -734,7 +784,7 @@ export type UnlockResult = "success" | "failed" | "cooldown" | "logout";
  */
 export type DeviceLockUnlockResult =
     | { status: "success"; mode: DeviceLockMode }
-    | { status: "not-supported"; reason: DeviceLockUnsupportedReason }
+    | { status: "not-supported"; reason: NativeDeviceLockUnavailableReason }
     | { status: "failed"; reason: DeviceLockFailureReason };
 
 /**
@@ -744,7 +794,7 @@ export const attemptDeviceLockUnlock =
     async (): Promise<DeviceLockUnlockResult> => {
         const capability = await resolveDeviceLockCapability();
         if (!capability.usable) {
-            logDeviceLockUnsupported("unlock", capability.reason);
+            logDeviceLockEvent("unlock", "not-supported", capability.reason);
             return { status: "not-supported", reason: capability.reason };
         }
 
@@ -753,7 +803,7 @@ export const attemptDeviceLockUnlock =
                 deviceLockUnlockPromptReason,
             );
             if (!unlocked) {
-                logDeviceLockFailure("unlock", "native-prompt-failed");
+                logDeviceLockEvent("unlock", "failed", "native-prompt-failed");
                 return { status: "failed", reason: "native-prompt-failed" };
             }
 
@@ -884,7 +934,6 @@ export const logoutAppLock = async () => {
     localStorage.removeItem(lsKeyEnabled);
     localStorage.removeItem(lsKeyAppLockMethod);
     localStorage.removeItem(lsKeyAutoLockTimeMs);
-    localStorage.removeItem(lsLegacyKeyDeviceLockEnabled);
 
     await Promise.all([
         clearPassphraseMaterial(),
@@ -924,7 +973,6 @@ export const disableAppLock = async () => {
 
     localStorage.setItem(lsKeyEnabled, "false");
     localStorage.removeItem(lsKeyAppLockMethod);
-    localStorage.removeItem(lsLegacyKeyDeviceLockEnabled);
 
     setSnapshot({
         ..._state.snapshot,
