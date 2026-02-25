@@ -37,6 +37,9 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     onRootClose,
 }) => {
     const state = useAppLockSnapshot();
+    const isMacOS =
+        typeof navigator != "undefined" &&
+        navigator.userAgent.toUpperCase().includes("MAC");
 
     // For the 4-digit PIN setup and confirmation dialog.
     const [pinDialogOpen, setPinDialogOpen] = useState(false);
@@ -85,34 +88,9 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         onRootClose();
     };
 
-    const handleToggleEnabled = useCallback(() => {
-        if (state.enabled) {
-            showMiniDialog({
-                title: t("disable"),
-                message: t("app_lock_disable_confirm"),
-                continue: {
-                    text: t("disable"),
-                    color: "critical",
-                    action: () => void disableAppLock(),
-                },
-            });
-        } else {
-            // When enabling, default to PIN setup.
-            setPinDialogOpen(true);
-        }
-    }, [state.enabled, showMiniDialog]);
-
-    const handleSelectPin = useCallback(() => {
-        setPinDialogOpen(true);
-    }, []);
-
-    const handleSelectPassword = useCallback(() => {
-        setPasswordDialogOpen(true);
-    }, []);
-
     const handleSelectDeviceLock = useCallback(async () => {
         // Ignore repeated clicks while setup is already running.
-        if (isSettingDeviceLock) return;
+        if (isSettingDeviceLock) return false;
 
         // Show loading state while native device-lock setup runs.
         setIsSettingDeviceLock(true);
@@ -120,7 +98,7 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
             // setupDeviceLock performs capability checks and returns typed
             // failure reasons when setup is unavailable or not completed.
             const result = await setupDeviceLock();
-            if (result.status === "success") return;
+            if (result.status === "success") return true;
 
             showMiniDialog(
                 errorDialogAttributes(deviceLockSetupErrorText(result)),
@@ -133,7 +111,42 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         } finally {
             setIsSettingDeviceLock(false);
         }
+
+        return false;
     }, [isSettingDeviceLock, showMiniDialog]);
+
+    const handleToggleEnabled = useCallback(() => {
+        if (state.enabled) {
+            showMiniDialog({
+                title: t("disable"),
+                message: t("app_lock_disable_confirm"),
+                continue: {
+                    text: t("disable"),
+                    color: "critical",
+                    action: () => void disableAppLock(),
+                },
+            });
+            return;
+        }
+
+        void (async () => {
+            if (isMacOS) {
+                const didSetupDeviceLock = await handleSelectDeviceLock();
+                if (didSetupDeviceLock) return;
+            }
+
+            // Fallback when macOS device lock is unavailable/cancelled.
+            setPinDialogOpen(true);
+        })();
+    }, [state.enabled, showMiniDialog, isMacOS, handleSelectDeviceLock]);
+
+    const handleSelectPin = useCallback(() => {
+        setPinDialogOpen(true);
+    }, []);
+
+    const handleSelectPassword = useCallback(() => {
+        setPasswordDialogOpen(true);
+    }, []);
 
     // Close the PIN setup dialog after a successful setup.
     const handlePinSetupComplete = useCallback(() => {
