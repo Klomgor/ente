@@ -90,8 +90,8 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         onRootClose();
     };
 
-    const handleSelectDeviceLock = useCallback(
-        async (): Promise<DeviceLockEnableOutcome> => {
+    const handleSelectDeviceLock =
+        useCallback(async (): Promise<DeviceLockEnableOutcome> => {
             // Ignore repeated clicks while setup is already running.
             if (isSettingDeviceLock) return "failed";
 
@@ -125,9 +125,7 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
             }
 
             return "failed";
-        },
-        [isSettingDeviceLock, showMiniDialog],
-    );
+        }, [isSettingDeviceLock, showMiniDialog]);
 
     const handleToggleEnabled = useCallback(() => {
         if (state.enabled) {

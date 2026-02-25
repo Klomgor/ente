@@ -1117,8 +1117,7 @@ const Account: React.FC<AccountProps> = ({
 };
 
 const DesktopAppLockSettings: React.FC<
-    Pick<SidebarProps, "onAuthenticateUser"> &
-        Pick<AccountProps, "onRootClose">
+    Pick<SidebarProps, "onAuthenticateUser"> & Pick<AccountProps, "onRootClose">
 > = ({ onAuthenticateUser, onRootClose }) => {
     const { show, props } = useModalVisibility();
 

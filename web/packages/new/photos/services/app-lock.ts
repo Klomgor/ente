@@ -193,11 +193,7 @@ const setBruteForceSnapshot = (
         snapshot.invalidAttemptCount !== invalidAttemptCount ||
         snapshot.cooldownExpiresAt !== cooldownExpiresAt
     ) {
-        setSnapshot({
-            ...snapshot,
-            invalidAttemptCount,
-            cooldownExpiresAt,
-        });
+        setSnapshot({ ...snapshot, invalidAttemptCount, cooldownExpiresAt });
     }
 };
 
