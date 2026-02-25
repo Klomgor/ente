@@ -144,8 +144,8 @@ export const attachIPCHandlers = () => {
         getNativeDeviceLockCapability(),
     );
 
-    // Triggers the OS-native authentication prompt (Touch ID / Windows Hello /
-    // etc.) and returns the auth result back to the renderer.
+    // Triggers the macOS-native Touch ID prompt and returns the auth result
+    // back to the renderer. Other platforms currently return false.
     ipcMain.handle("promptDeviceLock", (_, reason: string) =>
         promptDeviceLock(reason),
     );

@@ -117,7 +117,9 @@ export const appLockSnapshot = () => appLockState().snapshot;
 const setSnapshot = (snapshot: AppLockState) => {
     const state = appLockState();
     state.snapshot = snapshot;
-    state.listeners.forEach((l) => l());
+    state.listeners.forEach((l) => {
+        l();
+    });
 };
 
 // -- localStorage keys (synchronous, for cold-start reads) --
@@ -204,8 +206,8 @@ const readBruteForceStateFromKV = async () => {
     ]);
 
     return {
-        invalidAttemptCount: Math.max(0, invalidAttempts ?? 0),
-        cooldownExpiresAt: Math.max(0, cooldownExpiry ?? 0),
+        invalidAttemptCount: clampNonNegativeInt(Number(invalidAttempts ?? 0)),
+        cooldownExpiresAt: clampNonNegativeInt(Number(cooldownExpiry ?? 0)),
     };
 };
 
@@ -235,12 +237,17 @@ const readPersistedAppLockConfig = (): PersistedAppLockConfig => {
     let enabled = localStorage.getItem(lsKeyEnabled) === "true";
 
     // Read the currently persisted app-lock method.
-    const persistedLockType = localStorage.getItem(lsKeyAppLockMethod) as
-        | AppLockState["lockType"]
-        | null;
+    const persistedLockType = localStorage.getItem(lsKeyAppLockMethod);
+    const parsedLockType: AppLockState["lockType"] =
+        persistedLockType === "pin" ||
+        persistedLockType === "password" ||
+        persistedLockType === "device" ||
+        persistedLockType === "none"
+            ? persistedLockType
+            : "none";
 
     // Coerce missing values to "none" and gate "device" to supported platforms.
-    const lockType = normalizeDeviceLockType(persistedLockType ?? "none");
+    const lockType = normalizeDeviceLockType(parsedLockType);
 
     if (enabled && lockType === "none") {
         enabled = false;

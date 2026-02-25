@@ -485,9 +485,16 @@ const PinSetupDialog: React.FC<SetupDialogProps> = ({
             queueFocus(() => confirmInputRefs.current[0]?.focus(), 50);
             return;
         }
-        await setupPin(pinStr);
-        onComplete();
-        resetState();
+        try {
+            await setupPin(pinStr);
+            onComplete();
+            resetState();
+        } catch (e) {
+            log.error("Failed to set up PIN app lock", e);
+            setError(t("generic_error"));
+            setConfirmPin(["", "", "", ""]);
+            queueFocus(() => confirmInputRefs.current[0]?.focus(), 50);
+        }
     }, [pin, confirmPin, onComplete, queueFocus, resetState]);
 
     const renderPinInputs = (
@@ -682,10 +689,17 @@ const PasswordSetupDialog: React.FC<SetupDialogProps> = ({
             setConfirmPassword("");
             return;
         }
-        await setupPassword(password);
-        onComplete();
-        resetState();
-    }, [password, confirmPassword, onComplete, resetState]);
+        try {
+            await setupPassword(password);
+            onComplete();
+            resetState();
+        } catch (e) {
+            log.error("Failed to set up password app lock", e);
+            setError(t("generic_error"));
+            setConfirmPassword("");
+            queueFocus(() => confirmPasswordInputRef.current?.focus(), 300);
+        }
+    }, [password, confirmPassword, onComplete, queueFocus, resetState]);
 
     return (
         <TitledMiniDialog

@@ -51,7 +51,8 @@ export const promptDeviceLock = async (reason: string) => {
     const capability = getNativeDeviceLockCapability();
 
     if (!capability.available || capability.provider !== "touchid") {
-        throw new Error("Native device lock prompt is unavailable on this OS");
+        log.warn("Native device lock prompt is unavailable on this OS");
+        return false;
     }
 
     try {
