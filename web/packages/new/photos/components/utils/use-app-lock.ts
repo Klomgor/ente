@@ -1,4 +1,3 @@
-import { isDesktop } from "ente-base/app";
 import { subscribeMainWindowFocus } from "ente-base/electron";
 import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
 import { useEffect, useRef, useState } from "react";
@@ -15,22 +14,13 @@ import {
  * This is meant to be called once from the top-level `_app.tsx`.
  */
 export const useSetupAppLock = () => {
-    /**
-     * Since we require the Electron safe-storage on the desktop environment, this state variable
-     * initalizes as false on the desktop environment and later after ensuring that refreshAppLockStateFromSession()
-     * is completed transistions into the true.
-     *
-     * Since this safe-storage is not used in the web environment in web environments it's by default true.
-     */
-    const [isAppLockReady, setIsAppLockReady] = useState(() => !isDesktop);
+    const [isAppLockReady, setIsAppLockReady] = useState(false);
 
     useEffect(() => {
-        const isElectron = !!globalThis.electron;
         const isAppLockEnabled =
             localStorage.getItem("appLock.enabled") === "true";
-
         initAppLock();
-        if (!isElectron || !isAppLockEnabled) {
+        if (!isAppLockEnabled) {
             setIsAppLockReady(true);
             return;
         }

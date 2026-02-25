@@ -3,8 +3,8 @@
  *
  * App lock is a purely client-side feature that prevents unauthorized access to
  * the app after it has been authenticated. It supports PIN, password, and
- * local native device lock (macOS Touch ID), uses Argon2id for passphrase hashing, and
- * syncs lock state across tabs via BroadcastChannel.
+ * local native device lock (macOS Touch ID), and uses Argon2id for passphrase
+ * hashing.
  *
  * See: [Note: Snapshots and useSyncExternalStore].
  */
@@ -72,9 +72,14 @@ class AppLockModuleState {
 }
 
 /** State shared by the functions in this module. */
-let _state = new AppLockModuleState();
+let _state: AppLockModuleState | undefined;
 let _bruteForceStateHydration = Promise.resolve();
 let _bruteForceStateHydrationGeneration = 0;
+
+const appLockState = () => {
+    _state ??= new AppLockModuleState();
+    return _state;
+};
 
 /**
  * Subscribe to updates to {@link AppLockState}.
@@ -86,9 +91,10 @@ let _bruteForceStateHydrationGeneration = 0;
  * See: [Note: Snapshots and useSyncExternalStore].
  */
 export const appLockSubscribe = (onChange: () => void): (() => void) => {
-    _state.listeners.push(onChange);
+    const state = appLockState();
+    state.listeners.push(onChange);
     return () => {
-        _state.listeners = _state.listeners.filter((l) => l != onChange);
+        state.listeners = state.listeners.filter((l) => l != onChange);
     };
 };
 
@@ -97,7 +103,7 @@ export const appLockSubscribe = (onChange: () => void): (() => void) => {
  *
  * See also {@link appLockSubscribe}.
  */
-export const appLockSnapshot = () => _state.snapshot;
+export const appLockSnapshot = () => appLockState().snapshot;
 
 /**
  * Update the internal app lock state snapshot and notify all subscribers.
@@ -109,8 +115,9 @@ export const appLockSnapshot = () => _state.snapshot;
  * See: [Note: Snapshots and useSyncExternalStore].
  */
 const setSnapshot = (snapshot: AppLockState) => {
-    _state.snapshot = snapshot;
-    _state.listeners.forEach((l) => l());
+    const state = appLockState();
+    state.snapshot = snapshot;
+    state.listeners.forEach((l) => l());
 };
 
 // -- localStorage keys (synchronous, for cold-start reads) --
@@ -177,121 +184,20 @@ export const appLockCooldownDurationMs = (attemptCount: number): number => {
     );
 };
 
-// -- BroadcastChannel for multi-tab sync --
-
-/**
- * Create the BroadcastChannel used to sync app-lock state across tabs/windows.
- *
- * Returns `undefined` when BroadcastChannel is unavailable or blocked in the
- * current runtime.
- */
-
-const createAppLockChannel = () => {
-    if (typeof BroadcastChannel == "undefined") return undefined;
-
-    try {
-        return new BroadcastChannel("ente-app-lock");
-    } catch (error) {
-        // Some runtimes expose BroadcastChannel but block construction.
-        log.warn("BroadcastChannel unavailable for app lock sync", { error });
-        return undefined;
-    }
-};
-
-// BroadcastChannel instance used for cross-tab sync.
-const _channel = createAppLockChannel();
-
-/**
- * Message types broadcast over the app-lock channel:
- *
- * - `config-updated`: app-lock settings changed.
- * - `bruteforce-updated`: failed-attempt/cooldown state changed.
- * - `lock` / `unlock`: lock status changed in another tab/window.
- */
-interface AppLockConfigSyncMessage {
-    type: "config-updated";
-    enabled: AppLockState["enabled"];
-    lockType: AppLockState["lockType"];
-    autoLockTimeMs: AppLockState["autoLockTimeMs"];
-}
-
-interface AppLockBruteForceSyncMessage {
-    type: "bruteforce-updated";
-    invalidAttemptCount: AppLockState["invalidAttemptCount"];
-    cooldownExpiresAt: AppLockState["cooldownExpiresAt"];
-}
-
-type AppLockChannelMessage =
-    | { type: "lock" }
-    | { type: "unlock" }
-    | AppLockConfigSyncMessage
-    | AppLockBruteForceSyncMessage;
-
-/** Broadcast an app-lock sync message to other tabs/windows. */
-const postChannelMessage = (payload: AppLockChannelMessage) => {
-    _channel?.postMessage(payload);
-};
-
-/**
- * Extract only the app-lock config fields needed for cross-tab sync.
- */
-const appLockConfigFromSnapshot = (
-    snapshot: AppLockState,
-): Omit<AppLockConfigSyncMessage, "type"> => ({
-    enabled: snapshot.enabled,
-    lockType: snapshot.lockType,
-    autoLockTimeMs: snapshot.autoLockTimeMs,
-});
-
-/**
- * Broadcast the current app-lock config to other tabs/windows.
- */
-const syncConfigAcrossTabs = (snapshot: AppLockState) => {
-    const payload: AppLockConfigSyncMessage = {
-        type: "config-updated",
-        ...appLockConfigFromSnapshot(snapshot),
-    };
-    postChannelMessage(payload);
-};
-
-/**
- * Broadcast brute-force state to other tabs/windows.
- */
-const syncBruteForceAcrossTabs = (
-    invalidAttemptCount: number,
-    cooldownExpiresAt: number,
-) => {
-    const payload: AppLockBruteForceSyncMessage = {
-        type: "bruteforce-updated",
-        invalidAttemptCount,
-        cooldownExpiresAt,
-    };
-    postChannelMessage(payload);
-};
-
-/**
- * Update brute-force values in the in-memory snapshot and optionally broadcast.
- *
- * Updates the snapshot only when values change, then syncs to other tabs when
- * `shouldBroadcast` is true.
- */
 const setBruteForceSnapshot = (
     invalidAttemptCount: number,
     cooldownExpiresAt: number,
-    shouldBroadcast = false,
 ) => {
+    const snapshot = appLockState().snapshot;
     if (
-        _state.snapshot.invalidAttemptCount !== invalidAttemptCount ||
-        _state.snapshot.cooldownExpiresAt !== cooldownExpiresAt
+        snapshot.invalidAttemptCount !== invalidAttemptCount ||
+        snapshot.cooldownExpiresAt !== cooldownExpiresAt
     ) {
         setSnapshot({
-            ..._state.snapshot,
+            ...snapshot,
             invalidAttemptCount,
             cooldownExpiresAt,
         });
-    }
-    if (shouldBroadcast) {
-        syncBruteForceAcrossTabs(invalidAttemptCount, cooldownExpiresAt);
     }
 };
 
@@ -370,8 +276,9 @@ const setSnapshotFromPersistedConfig = (
     config: PersistedAppLockConfig,
     isLocked: boolean,
 ) => {
+    const snapshot = appLockState().snapshot;
     setSnapshot({
-        ..._state.snapshot,
+        ...snapshot,
         enabled: config.enabled,
         lockType: config.lockType,
         isLocked,
@@ -427,70 +334,6 @@ const withUnlockAttemptLock = async <T>(fn: () => Promise<T>) => {
     return withLocalUnlockAttemptLock(fn);
 };
 
-/**
- * Handle app-lock sync messages from other tabs/windows.
- */
-if (_channel) {
-    _channel.onmessage = (event: MessageEvent) => {
-        const data = event.data as AppLockChannelMessage;
-
-        switch (data.type) {
-            case "lock": {
-                const shouldIgnoreLockMessage =
-                    !_state.snapshot.enabled || _state.snapshot.lockType === "none";
-                if (shouldIgnoreLockMessage) {
-                    break;
-                }
-
-                setSnapshot({ ..._state.snapshot, isLocked: true });
-                hydrateBruteForceStateIfNeeded();
-                break;
-            }
-            case "unlock":
-                setSnapshot({
-                    ..._state.snapshot,
-                    isLocked: false,
-                    invalidAttemptCount: 0,
-                    cooldownExpiresAt: 0,
-                });
-                stopBruteForceStateHydration();
-                break;
-            case "config-updated": {
-                const autoLockTimeMs = clampNonNegativeInt(data.autoLockTimeMs);
-
-                if (!data.enabled) {
-                    setSnapshot({
-                        ..._state.snapshot,
-                        enabled: false,
-                        lockType: "none",
-                        autoLockTimeMs,
-                        isLocked: false,
-                        invalidAttemptCount: 0,
-                        cooldownExpiresAt: 0,
-                    });
-                    stopBruteForceStateHydration();
-                    break;
-                }
-
-                setSnapshot({
-                    ..._state.snapshot,
-                    enabled: data.enabled,
-                    lockType: normalizeDeviceLockType(data.lockType),
-                    autoLockTimeMs,
-                });
-                hydrateBruteForceStateIfNeeded();
-                break;
-            }
-            case "bruteforce-updated":
-                setBruteForceSnapshot(
-                    clampNonNegativeInt(data.invalidAttemptCount),
-                    clampNonNegativeInt(data.cooldownExpiresAt),
-                );
-                break;
-        }
-    };
-}
-
 // -- Public API --
 
 /**
@@ -542,10 +385,10 @@ const stopBruteForceStateHydration = () => {
 };
 
 const hydrateBruteForceStateIfNeeded = () => {
+    const snapshot = appLockState().snapshot;
     const isPassphraseLock =
-        _state.snapshot.lockType === "pin" ||
-        _state.snapshot.lockType === "password";
-    if (!_state.snapshot.isLocked || !isPassphraseLock) {
+        snapshot.lockType === "pin" || snapshot.lockType === "password";
+    if (!snapshot.isLocked || !isPassphraseLock) {
         stopBruteForceStateHydration();
         return;
     }
@@ -635,26 +478,26 @@ const clearPassphraseMaterial = async () =>
 /**
  * Reset brute-force protection state.
  *
- * Clears persisted invalid-attempt and cooldown values in KV, updates the
- * in-memory snapshot to zero, and optionally broadcasts the reset to other tabs.
+ * Clears persisted invalid-attempt and cooldown values in KV and updates the
+ * in-memory snapshot to zero.
  */
-const resetBruteForceState = async (shouldBroadcast = false) => {
+const resetBruteForceState = async () => {
     await Promise.all([
         setKV(kvKeyInvalidAttempts, 0),
         setKV(kvKeyCooldownExpiresAt, 0),
     ]);
-    setBruteForceSnapshot(0, 0, shouldBroadcast);
+    setBruteForceSnapshot(0, 0);
 };
 
 const unlockLocally = () => {
+    const snapshot = appLockState().snapshot;
     setSnapshot({
-        ..._state.snapshot,
+        ...snapshot,
         isLocked: false,
         invalidAttemptCount: 0,
         cooldownExpiresAt: 0,
     });
     stopBruteForceStateHydration();
-    postChannelMessage({ type: "unlock" });
 };
 
 /**
@@ -697,21 +540,21 @@ const setupPassphraseLock = async (
         setKV(kvKeySalt, derived.salt),
         setKV(kvKeyOpsLimit, derived.opsLimit),
         setKV(kvKeyMemLimit, derived.memLimit),
-        resetBruteForceState(true),
+        resetBruteForceState(),
     ]);
 
     localStorage.setItem(lsKeyAppLockMethod, lockType);
     localStorage.setItem(lsKeyEnabled, "true");
 
+    const snapshot = appLockState().snapshot;
     setSnapshot({
-        ..._state.snapshot,
+        ...snapshot,
         enabled: true,
         lockType,
         invalidAttemptCount: 0,
         cooldownExpiresAt: 0,
     });
     stopBruteForceStateHydration();
-    syncConfigAcrossTabs(_state.snapshot);
 };
 
 export const setupPin = async (pin: string) => setupPassphraseLock("pin", pin);
@@ -750,24 +593,24 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
         }
 
         // Reset brute-force lockout/cooldown state in KV and in memory.
-        await resetBruteForceState(true);
+        await resetBruteForceState();
 
         // Save the selected app-lock method and enabled state in localStorage.
         localStorage.setItem(lsKeyAppLockMethod, "device");
         localStorage.setItem(lsKeyEnabled, "true");
 
         // Update the in-memory app-lock snapshot.
+        const snapshot = appLockState().snapshot;
         setSnapshot({
-            ..._state.snapshot,
+            ...snapshot,
             enabled: true,
             lockType: "device",
             invalidAttemptCount: 0,
             cooldownExpiresAt: 0,
         });
 
-        // Stop ongoing brute-force hydration and sync config to other tabs/windows.
+        // Stop ongoing brute-force hydration.
         stopBruteForceStateHydration();
-        syncConfigAcrossTabs(_state.snapshot);
 
         return { status: "success", mode: "native" };
     } catch (e) {
@@ -835,9 +678,9 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
      * This flow applies only to PIN and password locks.
      * Guard against being called for any other lock type.
      */
+    const snapshot = appLockState().snapshot;
     const isPassphraseLock =
-        _state.snapshot.lockType === "pin" ||
-        _state.snapshot.lockType === "password";
+        snapshot.lockType === "pin" || snapshot.lockType === "password";
     if (!isPassphraseLock) {
         return "failed";
     }
@@ -853,12 +696,13 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
          * before validation so all tabs use the latest attempt/cooldown state.
          */
         const persistedState = await readBruteForceStateFromKV();
+        const latestSnapshot = appLockState().snapshot;
         const invalidAttemptCount = Math.max(
-            _state.snapshot.invalidAttemptCount,
+            latestSnapshot.invalidAttemptCount,
             persistedState.invalidAttemptCount,
         );
         const cooldownExpiresAt = Math.max(
-            _state.snapshot.cooldownExpiresAt,
+            latestSnapshot.cooldownExpiresAt,
             persistedState.cooldownExpiresAt,
         );
 
@@ -866,9 +710,10 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
         setBruteForceSnapshot(invalidAttemptCount, cooldownExpiresAt);
 
         // Check cooldown from in-memory state.
+        const snapshotWithCooldown = appLockState().snapshot;
         if (
-            _state.snapshot.cooldownExpiresAt > 0 &&
-            Date.now() < _state.snapshot.cooldownExpiresAt
+            snapshotWithCooldown.cooldownExpiresAt > 0 &&
+            Date.now() < snapshotWithCooldown.cooldownExpiresAt
         ) {
             return "cooldown";
         }
@@ -889,7 +734,7 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
 
         if (derivedKey === storedHash) {
             // Correct input: reset attempts, unlock.
-            await resetBruteForceState(true);
+            await resetBruteForceState();
             unlockLocally();
             return "success";
         }
@@ -901,7 +746,7 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
         if (count >= maxInvalidUnlockAttempts) {
             // Too many attempts: signal logout.
             await setKV(kvKeyCooldownExpiresAt, 0);
-            setBruteForceSnapshot(count, 0, true);
+            setBruteForceSnapshot(count, 0);
             return "logout";
         }
 
@@ -909,13 +754,13 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
             // Enforce cooldown with exponential backoff.
             const expiresAt = Date.now() + appLockCooldownDurationMs(count);
             await setKV(kvKeyCooldownExpiresAt, expiresAt);
-            setBruteForceSnapshot(count, expiresAt, true);
+            setBruteForceSnapshot(count, expiresAt);
 
             // The current failed attempt has triggered cooldown, so surface the
             // cooldown state immediately to callers/UI.
             return "cooldown";
         } else {
-            setBruteForceSnapshot(count, 0, true);
+            setBruteForceSnapshot(count, 0);
         }
 
         return "failed";
@@ -923,12 +768,12 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
 };
 
 /**
- * Lock the app and broadcast to other tabs.
+ * Lock the app.
  */
 export const lock = () => {
-    setSnapshot({ ..._state.snapshot, isLocked: true });
+    const snapshot = appLockState().snapshot;
+    setSnapshot({ ...snapshot, isLocked: true });
     hydrateBruteForceStateIfNeeded();
-    postChannelMessage({ type: "lock" });
 };
 
 /**
@@ -949,10 +794,7 @@ export const logoutAppLock = async () => {
     ]);
 
     stopBruteForceStateHydration();
-    _state = new AppLockModuleState();
-    syncConfigAcrossTabs(_state.snapshot);
-    syncBruteForceAcrossTabs(0, 0);
-    postChannelMessage({ type: "unlock" });
+    _state = undefined;
 };
 
 /**
@@ -961,8 +803,8 @@ export const logoutAppLock = async () => {
 export const setAutoLockTime = (ms: number) => {
     const autoLockTimeMs = clampNonNegativeInt(ms);
     localStorage.setItem(lsKeyAutoLockTimeMs, String(autoLockTimeMs));
-    setSnapshot({ ..._state.snapshot, autoLockTimeMs });
-    syncConfigAcrossTabs(_state.snapshot);
+    const snapshot = appLockState().snapshot;
+    setSnapshot({ ...snapshot, autoLockTimeMs });
 };
 
 /**
@@ -981,8 +823,9 @@ export const disableAppLock = async () => {
     localStorage.setItem(lsKeyEnabled, "false");
     localStorage.removeItem(lsKeyAppLockMethod);
 
+    const snapshot = appLockState().snapshot;
     setSnapshot({
-        ..._state.snapshot,
+        ...snapshot,
         enabled: false,
         lockType: "none",
         isLocked: false,
@@ -990,6 +833,4 @@ export const disableAppLock = async () => {
         cooldownExpiresAt: 0,
     });
     stopBruteForceStateHydration();
-    syncConfigAcrossTabs(_state.snapshot);
-    syncBruteForceAcrossTabs(0, 0);
 };

@@ -59,7 +59,13 @@ import "photoswipe/dist/photoswipe.css";
 import "styles/global.css";
 import "styles/photoswipe.css";
 
-const App: React.FC<AppProps> = ({ Component, pageProps }) => {
+type PhotosAppProps = AppProps<Record<string, unknown>>;
+
+type MainContentProps = Pick<PhotosAppProps, "Component" | "pageProps"> & {
+    isChangingRoute: boolean;
+};
+
+const App: React.FC<PhotosAppProps> = ({ Component, pageProps }) => {
     useSetupLogs();
 
     const isI18nReady = useSetupI18n();
@@ -70,13 +76,6 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
     const { loadingBarRef, showLoadingBar, hideLoadingBar } = useLoadingBar();
 
     const [watchFolderView, setWatchFolderView] = useState(false);
-    const isAppLockReady = useSetupAppLock();
-    const appLock = useAppLockSnapshot();
-    useAutoLockWhenBackgrounded(
-        appLock.enabled,
-        appLock.isLocked,
-        appLock.autoLockTimeMs,
-    );
 
     const logout = useCallback(() => void photosLogout(), []);
 
@@ -204,14 +203,20 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
             {isDesktop && <WindowTitlebar>{title}</WindowTitlebar>}
             <BaseContext value={baseContext}>
                 <PhotosAppContext value={appContext}>
-                    {!isI18nReady || !isAppLockReady ? (
+                    {!isI18nReady ? (
                         <LoadingIndicator />
+                    ) : isDesktop ? (
+                        <DesktopMainContent
+                            Component={Component}
+                            pageProps={pageProps}
+                            isChangingRoute={isChangingRoute}
+                        />
                     ) : (
-                        <>
-                            {isChangingRoute && <TranslucentLoadingOverlay />}
-                            <Component {...pageProps} />
-                            <AppLockOverlay />
-                        </>
+                        <WebMainContent
+                            Component={Component}
+                            pageProps={pageProps}
+                            isChangingRoute={isChangingRoute}
+                        />
                     )}
                 </PhotosAppContext>
             </BaseContext>
@@ -220,6 +225,42 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
 };
 
 export default App;
+
+const WebMainContent: React.FC<MainContentProps> = ({
+    Component,
+    pageProps,
+    isChangingRoute,
+}) => (
+    <>
+        {isChangingRoute && <TranslucentLoadingOverlay />}
+        <Component {...pageProps} />
+    </>
+);
+
+const DesktopMainContent: React.FC<MainContentProps> = ({
+    Component,
+    pageProps,
+    isChangingRoute,
+}) => {
+    const isAppLockReady = useSetupAppLock();
+    const appLock = useAppLockSnapshot();
+
+    useAutoLockWhenBackgrounded(
+        appLock.enabled,
+        appLock.isLocked,
+        appLock.autoLockTimeMs,
+    );
+
+    if (!isAppLockReady) return <LoadingIndicator />;
+
+    return (
+        <>
+            {isChangingRoute && <TranslucentLoadingOverlay />}
+            <Component {...pageProps} />
+            <AppLockOverlay />
+        </>
+    );
+};
 
 const redirectToFamilyPortal = () =>
     void getFamilyPortalRedirectURL().then((url) => {

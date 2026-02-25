@@ -977,8 +977,6 @@ const Account: React.FC<AccountProps> = ({
         useModalVisibility();
     const { show: showDeleteAccount, props: deleteAccountVisibilityProps } =
         useModalVisibility();
-    const { show: showAppLock, props: appLockVisibilityProps } =
-        useModalVisibility();
 
     const handleRootClose = () => {
         onClose();
@@ -1001,11 +999,6 @@ const Account: React.FC<AccountProps> = ({
         await onAuthenticateUser();
         showSessions();
     }, [onAuthenticateUser, showSessions]);
-
-    const handleAppLock = useCallback(async () => {
-        await onAuthenticateUser();
-        showAppLock();
-    }, [onAuthenticateUser, showAppLock]);
 
     useEffect(() => {
         if (!open || !pendingAction) return;
@@ -1078,9 +1071,12 @@ const Account: React.FC<AccountProps> = ({
                         onClick={handleActiveSessions}
                     />
                 </RowButtonGroup>
-                <RowButtonGroup>
-                    <RowButton label={t("app_lock")} onClick={handleAppLock} />
-                </RowButtonGroup>
+                {isDesktop && (
+                    <DesktopAppLockSettings
+                        onAuthenticateUser={onAuthenticateUser}
+                        onRootClose={onRootClose}
+                    />
+                )}
                 <RowButtonGroup>
                     <RowButton
                         label={t("change_password")}
@@ -1116,11 +1112,28 @@ const Account: React.FC<AccountProps> = ({
                 {...deleteAccountVisibilityProps}
                 {...{ onAuthenticateUser }}
             />
-            <AppLockSettings
-                {...appLockVisibilityProps}
-                onRootClose={onRootClose}
-            />
         </TitledNestedSidebarDrawer>
+    );
+};
+
+const DesktopAppLockSettings: React.FC<
+    Pick<SidebarProps, "onAuthenticateUser"> &
+        Pick<AccountProps, "onRootClose">
+> = ({ onAuthenticateUser, onRootClose }) => {
+    const { show, props } = useModalVisibility();
+
+    const handleOpen = useCallback(async () => {
+        await onAuthenticateUser();
+        show();
+    }, [onAuthenticateUser, show]);
+
+    return (
+        <>
+            <RowButtonGroup>
+                <RowButton label={t("app_lock")} onClick={handleOpen} />
+            </RowButtonGroup>
+            <AppLockSettings {...props} onRootClose={onRootClose} />
+        </>
     );
 };
 
