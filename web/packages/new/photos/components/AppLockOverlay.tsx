@@ -595,7 +595,7 @@ const DeviceLockUnlockForm: React.FC = () => {
                     color={error ? "critical.main" : "text.muted"}
                     textAlign="center"
                 >
-                    {error ?? t("device_lock_verify_description")}
+                    {error}
                 </Typography>
             </Stack>
         </AppLockCard>

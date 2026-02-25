@@ -709,6 +709,12 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
         // Update the snapshot with the latest values.
         setBruteForceSnapshot(invalidAttemptCount, cooldownExpiresAt);
 
+        if (invalidAttemptCount >= maxInvalidUnlockAttempts) {
+            await setKV(kvKeyCooldownExpiresAt, 0);
+            setBruteForceSnapshot(invalidAttemptCount, 0);
+            return "logout";
+        }
+
         // Check cooldown from in-memory state.
         const snapshotWithCooldown = appLockState().snapshot;
         if (

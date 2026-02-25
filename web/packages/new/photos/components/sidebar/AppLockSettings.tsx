@@ -31,6 +31,8 @@ import {
 } from "../../services/app-lock";
 import { useAppLockSnapshot } from "../utils/use-snapshot";
 
+type DeviceLockEnableOutcome = "success" | "cancelled" | "failed";
+
 export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
     open,
     onClose,
@@ -88,32 +90,44 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
         onRootClose();
     };
 
-    const handleSelectDeviceLock = useCallback(async () => {
-        // Ignore repeated clicks while setup is already running.
-        if (isSettingDeviceLock) return false;
+    const handleSelectDeviceLock = useCallback(
+        async (): Promise<DeviceLockEnableOutcome> => {
+            // Ignore repeated clicks while setup is already running.
+            if (isSettingDeviceLock) return "failed";
 
-        // Show loading state while native device-lock setup runs.
-        setIsSettingDeviceLock(true);
-        try {
-            // setupDeviceLock performs capability checks and returns typed
-            // failure reasons when setup is unavailable or not completed.
-            const result = await setupDeviceLock();
-            if (result.status === "success") return true;
+            // Show loading state while native device-lock setup runs.
+            setIsSettingDeviceLock(true);
+            try {
+                // setupDeviceLock performs capability checks and returns typed
+                // failure reasons when setup is unavailable or not completed.
+                const result = await setupDeviceLock();
+                if (result.status === "success") {
+                    return "success";
+                }
 
-            showMiniDialog(
-                errorDialogAttributes(deviceLockSetupErrorText(result)),
-            );
-        } catch (e) {
-            log.error("Failed to set up device lock app lock", e);
-            showMiniDialog(
-                errorDialogAttributes(t("device_lock_setup_failed")),
-            );
-        } finally {
-            setIsSettingDeviceLock(false);
-        }
+                if (
+                    result.status === "failed" &&
+                    result.reason === "native-prompt-failed"
+                ) {
+                    return "cancelled";
+                }
 
-        return false;
-    }, [isSettingDeviceLock, showMiniDialog]);
+                showMiniDialog(
+                    errorDialogAttributes(deviceLockSetupErrorText(result)),
+                );
+            } catch (e) {
+                log.error("Failed to set up device lock app lock", e);
+                showMiniDialog(
+                    errorDialogAttributes(t("device_lock_setup_failed")),
+                );
+            } finally {
+                setIsSettingDeviceLock(false);
+            }
+
+            return "failed";
+        },
+        [isSettingDeviceLock, showMiniDialog],
+    );
 
     const handleToggleEnabled = useCallback(() => {
         if (state.enabled) {
@@ -131,11 +145,11 @@ export const AppLockSettings: React.FC<NestedSidebarDrawerVisibilityProps> = ({
 
         void (async () => {
             if (isMacOS) {
-                const didSetupDeviceLock = await handleSelectDeviceLock();
-                if (didSetupDeviceLock) return;
+                const outcome = await handleSelectDeviceLock();
+                if (outcome !== "failed") return;
             }
 
-            // Fallback when macOS device lock is unavailable/cancelled.
+            // Fallback when macOS device lock setup is unavailable/failed.
             setPinDialogOpen(true);
         })();
     }, [state.enabled, showMiniDialog, isMacOS, handleSelectDeviceLock]);
