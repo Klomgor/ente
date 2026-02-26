@@ -29,6 +29,8 @@ export interface AppLockState {
     enabled: boolean;
     /** Active lock type. */
     lockType: "pin" | "password" | "device" | "none";
+    /** Why the lock screen is currently shown. */
+    lockScreenMode: "lock" | "reauthenticate";
     /** Whether the app is currently locked. */
     isLocked: boolean;
     /** Consecutive failed attempts in current lockout cycle. */
@@ -42,6 +44,7 @@ export interface AppLockState {
 const createDefaultState = (): AppLockState => ({
     enabled: false,
     lockType: "none",
+    lockScreenMode: "lock",
     isLocked: false,
     invalidAttemptCount: 0,
     cooldownExpiresAt: 0,
@@ -147,6 +150,34 @@ const maxInvalidUnlockAttempts = 10;
 const cooldownStartsAtAttempt = 5;
 const cooldownBaseSeconds = 30;
 const unlockAttemptLockName = "ente-app-lock-unlock-attempt";
+const trustedPromptAutoLockSuppressionMs = 5 * 1e3;
+let suppressAutoLockOnBlurUntil = 0;
+
+/**
+ * Temporarily suppress auto-lock on blur for trusted app-initiated prompts.
+ *
+ * This is used for native device authentication prompts that can transiently
+ * blur the app window even though the user hasn't backgrounded the app.
+ */
+export const suppressAutoLockOnBlurForTrustedPrompt = () => {
+    suppressAutoLockOnBlurUntil = Math.max(
+        suppressAutoLockOnBlurUntil,
+        Date.now() + trustedPromptAutoLockSuppressionMs,
+    );
+};
+
+/**
+ * Return true if blur-triggered auto-lock should currently be suppressed.
+ */
+export const shouldSuppressAutoLockOnBlur = () =>
+    Date.now() < suppressAutoLockOnBlurUntil;
+
+/**
+ * Clear any pending blur auto-lock suppression.
+ */
+export const clearAutoLockBlurSuppression = () => {
+    suppressAutoLockOnBlurUntil = 0;
+};
 
 export type DeviceLockMode = "native";
 
@@ -284,6 +315,7 @@ const setSnapshotFromPersistedConfig = (
         ...snapshot,
         enabled: config.enabled,
         lockType: config.lockType,
+        lockScreenMode: "lock",
         isLocked,
         autoLockTimeMs: config.autoLockTimeMs,
     });
@@ -496,6 +528,7 @@ const unlockLocally = () => {
     const snapshot = appLockState().snapshot;
     setSnapshot({
         ...snapshot,
+        lockScreenMode: "lock",
         isLocked: false,
         invalidAttemptCount: 0,
         cooldownExpiresAt: 0,
@@ -586,6 +619,10 @@ export const setupDeviceLock = async (): Promise<SetupDeviceLockResult> => {
     }
 
     try {
+        // Ignore blur auto-lock caused by this trusted, app-initiated native
+        // prompt.
+        suppressAutoLockOnBlurForTrustedPrompt();
+
         // Trigger the OS-native authentication prompt (for example, Touch ID).
         const unlocked = await globalThis.electron?.promptDeviceLock(
             deviceLockEnablePromptReason,
@@ -777,11 +814,50 @@ export const attemptUnlock = async (input: string): Promise<UnlockResult> => {
 };
 
 /**
+ * Perform an explicit reauthentication using app lock.
+ *
+ * Returns `true` when app lock was successfully used for reauthentication.
+ * Returns `false` when app lock is unavailable or cannot be started, so callers
+ * can fall back to an alternate flow (for example, master password prompt).
+ */
+export const reauthenticateWithAppLock = async (): Promise<boolean> => {
+    try {
+        const snapshot = appLockSnapshot();
+        let canUseAppLock = snapshot.enabled && snapshot.lockType !== "none";
+        if (canUseAppLock && snapshot.lockType === "device") {
+            // For device lock, ensure native auth is actually usable right now.
+            // If unavailable (e.g. Touch ID disabled), fall back to password flow.
+            const capability = await resolveDeviceLockCapability();
+            canUseAppLock = capability.usable;
+        }
+        if (!canUseAppLock) return false;
+
+        return await new Promise<boolean>((resolve) => {
+            const unsubscribe = appLockSubscribe(() => {
+                if (!appLockSnapshot().isLocked) {
+                    unsubscribe();
+                    resolve(true);
+                }
+            });
+
+            lock("reauthenticate");
+            if (!appLockSnapshot().isLocked) {
+                unsubscribe();
+                resolve(false);
+            }
+        });
+    } catch (e) {
+        log.error("Failed to start app lock reauthentication", e);
+        return false;
+    }
+};
+
+/**
  * Lock the app.
  */
-export const lock = () => {
+export const lock = (lockScreenMode: AppLockState["lockScreenMode"] = "lock") => {
     const snapshot = appLockState().snapshot;
-    setSnapshot({ ...snapshot, isLocked: true });
+    setSnapshot({ ...snapshot, lockScreenMode, isLocked: true });
     hydrateBruteForceStateIfNeeded();
 };
 
@@ -837,6 +913,7 @@ export const disableAppLock = async () => {
         ...snapshot,
         enabled: false,
         lockType: "none",
+        lockScreenMode: "lock",
         isLocked: false,
         invalidAttemptCount: 0,
         cooldownExpiresAt: 0,

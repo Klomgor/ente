@@ -50,8 +50,70 @@ export const AppLockOverlay: React.FC = () => {
     const appLock = useAppLockSnapshot();
     const { logout } = useBaseContext();
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const isReauthentication = appLock.lockScreenMode === "reauthenticate";
+
+    useEffect(() => {
+        if (!appLock.isLocked) setShowLogoutConfirm(false);
+    }, [appLock.isLocked]);
 
     if (!appLock.isLocked) return null;
+
+    const unlockForm =
+        appLock.lockType === "pin" ? (
+            <PinUnlockForm
+                appLock={appLock}
+                isReauthentication={isReauthentication}
+                onLogout={() => setShowLogoutConfirm(true)}
+            />
+        ) : appLock.lockType === "password" ? (
+            <PasswordUnlockForm
+                appLock={appLock}
+                isReauthentication={isReauthentication}
+                onLogout={() => setShowLogoutConfirm(true)}
+            />
+        ) : appLock.lockType === "device" ? (
+            <DeviceLockUnlockForm isReauthentication={isReauthentication} />
+        ) : (
+            <PinUnlockForm
+                appLock={appLock}
+                isReauthentication={isReauthentication}
+                onLogout={() => setShowLogoutConfirm(true)}
+            />
+        );
+
+    if (isReauthentication) {
+        return (
+            <Modal
+                open
+                disableEscapeKeyDown
+                aria-label={t("authenticate")}
+                sx={{ zIndex: "calc(var(--mui-zIndex-modal) + 1)" }}
+            >
+                <Box
+                    sx={{
+                        position: "fixed",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        p: 2,
+                        outline: "none",
+                    }}
+                    style={
+                        { WebkitAppRegion: "no-drag" } as React.CSSProperties
+                    }
+                >
+                    {unlockForm}
+                    {showLogoutConfirm && (
+                        <LogoutConfirmation
+                            onConfirm={logout}
+                            onCancel={() => setShowLogoutConfirm(false)}
+                        />
+                    )}
+                </Box>
+            </Modal>
+        );
+    }
 
     return (
         <Modal
@@ -113,24 +175,7 @@ export const AppLockOverlay: React.FC = () => {
                 </Box>
 
                 {/* Centered form content */}
-                {appLock.lockType === "pin" ? (
-                    <PinUnlockForm
-                        appLock={appLock}
-                        onLogout={() => setShowLogoutConfirm(true)}
-                    />
-                ) : appLock.lockType === "password" ? (
-                    <PasswordUnlockForm
-                        appLock={appLock}
-                        onLogout={() => setShowLogoutConfirm(true)}
-                    />
-                ) : appLock.lockType === "device" ? (
-                    <DeviceLockUnlockForm />
-                ) : (
-                    <PinUnlockForm
-                        appLock={appLock}
-                        onLogout={() => setShowLogoutConfirm(true)}
-                    />
-                )}
+                {unlockForm}
 
                 {/* Logout confirmation overlays on top */}
                 {showLogoutConfirm && (
@@ -148,6 +193,7 @@ export const AppLockOverlay: React.FC = () => {
 
 interface UnlockFormProps {
     appLock: ReturnType<typeof useAppLockSnapshot>;
+    isReauthentication: boolean;
     onLogout: () => void;
 }
 
@@ -255,7 +301,11 @@ const deviceLockErrorText = (result: DeviceLockUnlockResult) => {
 
 // -- PIN unlock form --
 
-const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
+const PinUnlockForm: React.FC<UnlockFormProps> = ({
+    appLock,
+    isReauthentication,
+    onLogout,
+}) => {
     const { logout } = useBaseContext();
 
     const [pin, setPin] = useState(["", "", "", ""]);
@@ -362,7 +412,9 @@ const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
                 sx={{ maxWidth: 340, width: "100%" }}
             >
                 <LockOutlinedIcon sx={{ fontSize: 48, color: "text.muted" }} />
-                <Typography variant="h3">{t("app_locked")}</Typography>
+                <Typography variant="h3">
+                    {isReauthentication ? t("authenticate") : t("app_locked")}
+                </Typography>
                 <Typography variant="small" color="text.muted" sx={{ mb: 1 }}>
                     {t("enter_pin")}
                 </Typography>
@@ -426,6 +478,7 @@ const PinUnlockForm: React.FC<UnlockFormProps> = ({ appLock, onLogout }) => {
 
 const PasswordUnlockForm: React.FC<UnlockFormProps> = ({
     appLock,
+    isReauthentication,
     onLogout,
 }) => {
     const { logout } = useBaseContext();
@@ -482,7 +535,9 @@ const PasswordUnlockForm: React.FC<UnlockFormProps> = ({
                 sx={{ maxWidth: 340, width: "100%" }}
             >
                 <LockOutlinedIcon sx={{ fontSize: 48, color: "text.muted" }} />
-                <Typography variant="h3">{t("app_locked")}</Typography>
+                <Typography variant="h3">
+                    {isReauthentication ? t("password") : t("app_locked")}
+                </Typography>
                 <Typography variant="small" color="text.muted">
                     {t("app_lock_enter_password")}
                 </Typography>
@@ -500,7 +555,11 @@ const PasswordUnlockForm: React.FC<UnlockFormProps> = ({
                         setError(undefined);
                     }}
                     disabled={loading}
-                    placeholder={t("app_lock_password")}
+                    placeholder={
+                        isReauthentication
+                            ? t("password")
+                            : t("app_lock_password")
+                    }
                     autoComplete="off"
                     slotProps={{
                         input: {
@@ -520,7 +579,7 @@ const PasswordUnlockForm: React.FC<UnlockFormProps> = ({
                     color="accent"
                     disabled={!password || loading}
                 >
-                    {t("unlock")}
+                    {isReauthentication ? t("authenticate") : t("unlock")}
                 </FocusVisibleButton>
 
                 <ErrorMessage
@@ -534,7 +593,9 @@ const PasswordUnlockForm: React.FC<UnlockFormProps> = ({
 
 // -- Device lock unlock form --
 
-const DeviceLockUnlockForm: React.FC = () => {
+const DeviceLockUnlockForm: React.FC<{ isReauthentication: boolean }> = ({
+    isReauthentication,
+}) => {
     const [error, setError] = useState<string>();
     const [loading, setLoading] = useState(false);
     const isUnlockInProgress = useRef(false);
@@ -566,7 +627,9 @@ const DeviceLockUnlockForm: React.FC = () => {
                 sx={{ maxWidth: 340, width: "100%" }}
             >
                 <FingerprintIcon sx={{ fontSize: 48, color: "text.muted" }} />
-                <Typography variant="h3">{t("app_locked")}</Typography>
+                <Typography variant="h3">
+                    {isReauthentication ? t("authenticate") : t("app_locked")}
+                </Typography>
                 <Typography
                     variant="small"
                     color="text.muted"
@@ -585,6 +648,8 @@ const DeviceLockUnlockForm: React.FC = () => {
                 >
                     {loading ? (
                         <CircularProgress size={18} color="inherit" />
+                    ) : isReauthentication ? (
+                        t("authenticate")
                     ) : (
                         t("device_lock_login")
                     )}

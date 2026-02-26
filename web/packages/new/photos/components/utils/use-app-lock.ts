@@ -5,9 +5,11 @@ import {
 import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
 import { useEffect, useRef, useState } from "react";
 import {
+    clearAutoLockBlurSuppression,
     initAppLock,
     lock,
     refreshAppLockStateFromSession,
+    shouldSuppressAutoLockOnBlur,
     type AppLockState,
 } from "../../services/app-lock";
 
@@ -94,6 +96,7 @@ export const useAutoLockWhenBackgrounded = (
         // Starts auto-lock unless the app is already locked.
         const startAutoLockTimer = () => {
             if (isLocked) return;
+            if (shouldSuppressAutoLockOnBlur()) return;
 
             const existingDeadline = autoLockDueAtTimestampRef.current;
             if (existingDeadline !== null && Date.now() < existingDeadline) {
@@ -118,6 +121,7 @@ export const useAutoLockWhenBackgrounded = (
 
         // On foreground, lock immediately if the deadline passed; otherwise clear pending timer.
         const handleAppForegrounded = () => {
+            clearAutoLockBlurSuppression();
             if (lockIfDeadlineElapsed()) return;
             clearAutoLockTimer();
         };

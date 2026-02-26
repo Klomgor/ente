@@ -27,6 +27,7 @@ import {
 import { stashRedirect } from "ente-accounts/services/redirect";
 import { isSessionInvalid } from "ente-accounts/services/session";
 import { ensureLocalUser } from "ente-accounts/services/user";
+import { isDesktop } from "ente-base/app";
 import type { MiniDialogAttributes } from "ente-base/components/MiniDialog";
 import { NavbarBase } from "ente-base/components/Navbar";
 import { SingleInputDialog } from "ente-base/components/SingleInputDialog";
@@ -58,6 +59,7 @@ import {
     hasPendingAlbumToJoin,
     processPendingAlbumJoin,
 } from "ente-new/albums/services/join-album";
+import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
 import {
     CollectionSelector,
@@ -323,7 +325,7 @@ const Page: React.FC = () => {
         undefined,
     );
 
-    const authenticateUser = useCallback(
+    const authenticateUserWithPasswordModal = useCallback(
         () =>
             new Promise<void>((resolve, reject) => {
                 onAuthenticateCallback.current = resolve;
@@ -332,6 +334,15 @@ const Page: React.FC = () => {
             }),
         [],
     );
+
+    const authenticateUser = useCallback(async () => {
+        if (!isDesktop) return authenticateUserWithPasswordModal();
+
+        const didAuthenticateWithAppLock = await reauthenticateWithAppLock();
+        if (didAuthenticateWithAppLock) return;
+
+        return authenticateUserWithPasswordModal();
+    }, [authenticateUserWithPasswordModal]);
 
     const handleCloseAuthenticateUser = useCallback(() => {
         authenticateUserVisibilityProps.onClose();
