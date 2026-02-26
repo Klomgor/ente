@@ -155,6 +155,11 @@ const onMainWindowFocus = (cb: (() => void) | undefined) => {
     if (cb) ipcRenderer.on("mainWindowFocus", cb);
 };
 
+const onMainWindowBlur = (cb: (() => void) | undefined) => {
+    ipcRenderer.removeAllListeners("mainWindowBlur");
+    if (cb) ipcRenderer.on("mainWindowBlur", cb);
+};
+
 const onOpenEnteURL = (cb: ((url: string) => void) | undefined) => {
     ipcRenderer.removeAllListeners("openEnteURL");
     if (cb) ipcRenderer.on("openEnteURL", (_, url: string) => cb(url));
@@ -389,6 +394,7 @@ contextBridge.exposeInMainWorld("electron", {
     getNativeDeviceLockCapability,
     promptDeviceLock,
     onMainWindowFocus,
+    onMainWindowBlur,
     onOpenEnteURL,
 
     // - App update

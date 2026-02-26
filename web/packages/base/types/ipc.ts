@@ -142,6 +142,18 @@ export interface Electron {
     onMainWindowFocus: (cb: (() => void) | undefined) => void;
 
     /**
+     * Set or clear the callback {@link cb} to invoke whenever the app goes to
+     * the background. More precisely, the callback gets invoked when the main
+     * window blurs and the app is no longer focused.
+     *
+     * Setting a callback clears any previous callbacks.
+     *
+     * @param cb The function to call when the app is backgrounded. Pass
+     * `undefined` to clear the callback.
+     */
+    onMainWindowBlur: (cb: (() => void) | undefined) => void;
+
+    /**
      * Set or clear the callback {@link cb} to invoke whenever the app gets
      * asked to open a deeplink that begins with "ente://". This allows the
      * Node.js layer to ask the renderer to handle deeplinks and redirect itself

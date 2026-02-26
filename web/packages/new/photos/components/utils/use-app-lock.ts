@@ -1,4 +1,7 @@
-import { subscribeMainWindowFocus } from "ente-base/electron";
+import {
+    subscribeMainWindowBlur,
+    subscribeMainWindowFocus,
+} from "ente-base/electron";
 import { updateSessionFromElectronSafeStorageIfNeeded } from "ente-base/session";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -87,13 +90,10 @@ export const useAutoLockWhenBackgrounded = (
             return true;
         };
 
-        // Called when the app loses foreground focus (blur/visibility change).
+        // Called when the app is backgrounded.
         // Starts auto-lock unless the app is already locked.
         const startAutoLockTimer = () => {
             if (isLocked) return;
-
-            // Avoid extending the countdown when blur + visibility events both
-            // fire for a single background transition.
 
             const existingDeadline = autoLockDueAtTimestampRef.current;
             if (existingDeadline !== null && Date.now() < existingDeadline) {
@@ -132,25 +132,21 @@ export const useAutoLockWhenBackgrounded = (
             }
         };
 
-        const handleWindowBlur = () => {
-            if (!document.hidden) {
-                startAutoLockTimer();
-            }
-        };
-
         const handleWindowFocus = () => {
             handleAppForegrounded();
         };
 
         let unsubscribeMainWindowFocus: (() => void) | undefined;
+        let unsubscribeMainWindowBlur: (() => void) | undefined;
         if (globalThis.electron) {
             unsubscribeMainWindowFocus = subscribeMainWindowFocus(
                 handleAppForegrounded,
             );
+            unsubscribeMainWindowBlur =
+                subscribeMainWindowBlur(startAutoLockTimer);
         }
 
         document.addEventListener("visibilitychange", handleVisibilityChange);
-        window.addEventListener("blur", handleWindowBlur);
         window.addEventListener("focus", handleWindowFocus);
 
         // cleanup
@@ -159,9 +155,9 @@ export const useAutoLockWhenBackgrounded = (
                 "visibilitychange",
                 handleVisibilityChange,
             );
-            window.removeEventListener("blur", handleWindowBlur);
             window.removeEventListener("focus", handleWindowFocus);
             unsubscribeMainWindowFocus?.();
+            unsubscribeMainWindowBlur?.();
             clearAutoLockTimer();
         };
     }, [enabled, isLocked, autoLockTimeMs]);

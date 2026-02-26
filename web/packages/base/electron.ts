@@ -25,9 +25,12 @@ export const ensureElectron = (): Electron => {
 };
 
 type MainWindowFocusListener = () => void;
+type MainWindowBlurListener = () => void;
 
 const mainWindowFocusListeners = new Set<MainWindowFocusListener>();
 let hasAttachedMainWindowFocusBridge = false;
+const mainWindowBlurListeners = new Set<MainWindowBlurListener>();
+let hasAttachedMainWindowBlurBridge = false;
 
 const emitMainWindowFocus = () => {
     for (const listener of mainWindowFocusListeners) {
@@ -72,5 +75,49 @@ export const subscribeMainWindowFocus = (
     return () => {
         mainWindowFocusListeners.delete(listener);
         detachMainWindowFocusBridgeIfNeeded();
+    };
+};
+
+const emitMainWindowBlur = () => {
+    for (const listener of mainWindowBlurListeners) {
+        listener();
+    }
+};
+
+const attachMainWindowBlurBridgeIfNeeded = () => {
+    if (hasAttachedMainWindowBlurBridge) return;
+    const electron = globalThis.electron;
+    if (!electron) return;
+    if (typeof electron.onMainWindowBlur != "function") return;
+    electron.onMainWindowBlur(emitMainWindowBlur);
+    hasAttachedMainWindowBlurBridge = true;
+};
+
+const detachMainWindowBlurBridgeIfNeeded = () => {
+    if (!hasAttachedMainWindowBlurBridge || mainWindowBlurListeners.size > 0) {
+        return;
+    }
+
+    const electron = globalThis.electron;
+    if (electron && typeof electron.onMainWindowBlur == "function") {
+        electron.onMainWindowBlur(undefined);
+    }
+    hasAttachedMainWindowBlurBridge = false;
+};
+
+/**
+ * Subscribe to main window blur events on Electron.
+ *
+ * This helper multiplexes listeners over Electron's single-callback API,
+ * allowing multiple consumers to listen concurrently.
+ */
+export const subscribeMainWindowBlur = (
+    listener: MainWindowBlurListener,
+): (() => void) => {
+    mainWindowBlurListeners.add(listener);
+    attachMainWindowBlurBridgeIfNeeded();
+    return () => {
+        mainWindowBlurListeners.delete(listener);
+        detachMainWindowBlurBridgeIfNeeded();
     };
 };
