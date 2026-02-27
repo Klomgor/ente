@@ -119,13 +119,15 @@ class NoMailAppSheet extends StatelessWidget {
   }
 
   String _buildCopyAllPayload(AppLocalizations l10n) {
+    final shouldIncludeLogsInCopyAll = logsFilePath == null &&
+        logsLabel != null &&
+        logsLabel!.trim().isNotEmpty;
     final items = <String>[
       "${l10n.subject}: $subject",
       "${l10n.message}: $message",
       if (deviceInfo != null && deviceInfo!.trim().isNotEmpty)
         "${l10n.deviceInfo}: ${deviceInfo!.trim()}",
-      if (logsLabel != null && logsLabel!.trim().isNotEmpty)
-        "${l10n.logs}: ${logsLabel!.trim()}",
+      if (shouldIncludeLogsInCopyAll) "${l10n.logs}: ${logsLabel!.trim()}",
     ];
     return items.join("\n\n");
   }

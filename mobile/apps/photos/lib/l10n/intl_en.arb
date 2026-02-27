@@ -741,7 +741,8 @@
   "message": "Message",
   "deviceInfo": "Device info",
   "logs": "Logs",
-  "logsNotCopiedDownloadNote": "Logs are not copied. Download the logs and attach them to your email.",
+  "export": "Export",
+  "logsNotCopiedDownloadNote": "Logs are not copied. Export the logs and attach them to your email.",
   "attachedSize": "Attached ({size})",
   "@attachedSize": {
     "description": "Label for attached logs with formatted file size",

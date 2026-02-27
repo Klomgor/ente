@@ -1,6 +1,5 @@
 import "dart:io";
 
-import "package:ente_pure_utils/ente_pure_utils.dart";
 import "package:flutter/material.dart";
 import "package:logging/logging.dart";
 import "package:photos/generated/l10n.dart";
@@ -182,8 +181,7 @@ class _ReportIssuePageState extends State<ReportIssuePage> {
 
       if (_attachLogs) {
         logsZipFilePath = await getZippedLogsFile(context);
-        final logsSize = await File(logsZipFilePath).length();
-        logsLabel = l10n.attachedSize(size: formatBytes(logsSize));
+        logsLabel = l10n.export;
       }
 
       final didOpenComposer = _attachLogs
