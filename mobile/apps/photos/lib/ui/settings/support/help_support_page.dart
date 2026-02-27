@@ -7,7 +7,6 @@ import "package:photos/theme/ente_theme.dart";
 import "package:photos/ui/common/web_page.dart";
 import "package:photos/ui/components/menu_item_widget/menu_item_widget_new.dart";
 import "package:photos/ui/components/menu_section_title.dart";
-import "package:photos/ui/components/settings/settings_grouped_card.dart";
 import "package:photos/ui/notification/toast.dart";
 import "package:photos/ui/settings/support/ask_question_page.dart";
 import "package:photos/ui/settings/support/report_issue_page.dart";
@@ -59,39 +58,39 @@ class HelpSupportPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       MenuSectionTitle(title: l10n.browseHelpPages),
-                      SettingsGroupedCard(
-                        children: [
-                          _buildHelpTopicItem(
-                            context,
-                            title: l10n.searchAndDiscovery,
-                            subText: l10n.searchAndDiscoveryDesc,
-                            icon: HugeIcons.strokeRoundedSearch01,
-                          ),
-                          _buildHelpTopicItem(
-                            context,
-                            title: l10n.backupAndSync,
-                            subText: l10n.backupAndSyncDesc,
-                            icon: HugeIcons.strokeRoundedCloudUpload,
-                          ),
-                          _buildHelpTopicItem(
-                            context,
-                            title: l10n.sharingAndCollaboration,
-                            subText: l10n.sharingAndCollaborationDesc,
-                            icon: HugeIcons.strokeRoundedShare01,
-                          ),
-                          _buildHelpTopicItem(
-                            context,
-                            title: l10n.storageAndPlans,
-                            subText: l10n.storageAndPlansDesc,
-                            icon: HugeIcons.strokeRoundedHardDrive,
-                          ),
-                          _buildHelpTopicItem(
-                            context,
-                            title: l10n.troubleshooting,
-                            subText: l10n.troubleshootingDesc,
-                            icon: HugeIcons.strokeRoundedWrench01,
-                          ),
-                        ],
+                      _buildHelpTopicItem(
+                        context,
+                        title: l10n.searchAndDiscovery,
+                        subText: l10n.searchAndDiscoveryDesc,
+                        icon: HugeIcons.strokeRoundedSearch01,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildHelpTopicItem(
+                        context,
+                        title: l10n.backupAndSync,
+                        subText: l10n.backupAndSyncDesc,
+                        icon: HugeIcons.strokeRoundedCloudUpload,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildHelpTopicItem(
+                        context,
+                        title: l10n.sharingAndCollaboration,
+                        subText: l10n.sharingAndCollaborationDesc,
+                        icon: HugeIcons.strokeRoundedShare01,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildHelpTopicItem(
+                        context,
+                        title: l10n.storageAndPlans,
+                        subText: l10n.storageAndPlansDesc,
+                        icon: HugeIcons.strokeRoundedHardDrive,
+                      ),
+                      const SizedBox(height: 8),
+                      _buildHelpTopicItem(
+                        context,
+                        title: l10n.troubleshooting,
+                        subText: l10n.troubleshootingDesc,
+                        icon: HugeIcons.strokeRoundedWrench01,
                       ),
                       _SupportLink(
                         label: l10n.viewAllHelpTopics,
@@ -104,59 +103,54 @@ class HelpSupportPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                       MenuSectionTitle(title: l10n.getInTouch),
-                      SettingsGroupedCard(
-                        children: [
-                          MenuItemWidgetNew(
-                            title: l10n.reportAnIssue,
-                            borderRadius: 0,
-                            leadingIconWidget: _buildIconWidget(
-                              context,
-                              HugeIcons.strokeRoundedBug02,
+                      MenuItemWidgetNew(
+                        title: l10n.reportAnIssue,
+                        leadingIconWidget: _buildIconWidget(
+                          context,
+                          HugeIcons.strokeRoundedBug02,
+                        ),
+                        trailingIcon: Icons.chevron_right_outlined,
+                        trailingIconIsMuted: true,
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const ReportIssuePage(),
                             ),
-                            trailingIcon: Icons.chevron_right_outlined,
-                            trailingIconIsMuted: true,
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const ReportIssuePage(),
-                                ),
-                              );
-                            },
-                          ),
-                          MenuItemWidgetNew(
-                            title: l10n.askAQuestion,
-                            borderRadius: 0,
-                            leadingIconWidget: _buildIconWidget(
-                              context,
-                              HugeIcons.strokeRoundedHelpCircle,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      MenuItemWidgetNew(
+                        title: l10n.askAQuestion,
+                        leadingIconWidget: _buildIconWidget(
+                          context,
+                          HugeIcons.strokeRoundedHelpCircle,
+                        ),
+                        trailingIcon: Icons.chevron_right_outlined,
+                        trailingIconIsMuted: true,
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AskQuestionPage(),
                             ),
-                            trailingIcon: Icons.chevron_right_outlined,
-                            trailingIconIsMuted: true,
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const AskQuestionPage(),
-                                ),
-                              );
-                            },
-                          ),
-                          MenuItemWidgetNew(
-                            title: l10n.requestAFeature,
-                            borderRadius: 0,
-                            leadingIconWidget: _buildIconWidget(
-                              context,
-                              HugeIcons.strokeRoundedIdea01,
-                            ),
-                            trailingIcon: Icons.chevron_right_outlined,
-                            trailingIconIsMuted: true,
-                            onTap: () async {
-                              await launchUrlString(
-                                githubDiscussionsUrl,
-                                mode: LaunchMode.externalApplication,
-                              );
-                            },
-                          ),
-                        ],
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      MenuItemWidgetNew(
+                        title: l10n.requestAFeature,
+                        leadingIconWidget: _buildIconWidget(
+                          context,
+                          HugeIcons.strokeRoundedIdea01,
+                        ),
+                        trailingIcon: Icons.chevron_right_outlined,
+                        trailingIconIsMuted: true,
+                        onTap: () async {
+                          await launchUrlString(
+                            githubDiscussionsUrl,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        },
                       ),
                       _SupportLink(
                         label: l10n.exportLogs,
@@ -182,10 +176,13 @@ class HelpSupportPage extends StatelessWidget {
     required String subText,
     required List<List<dynamic>> icon,
   }) {
+    final textTheme = getEnteTextTheme(context);
     return MenuItemWidgetNew(
       title: title,
       subText: subText,
-      borderRadius: 0,
+      subTextStyle: textTheme.miniMuted,
+      verticalPaddingWithSubText: 12,
+      titleToSubTextSpacing: 2,
       leadingIconWidget: _buildIconWidget(context, icon),
       trailingIcon: Icons.chevron_right_outlined,
       trailingIconIsMuted: true,
