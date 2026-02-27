@@ -59,7 +59,6 @@ import {
     hasPendingAlbumToJoin,
     processPendingAlbumJoin,
 } from "ente-new/albums/services/join-album";
-import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import { AssignPersonDialog } from "ente-new/photos/components/AssignPersonDialog";
 import {
     CollectionSelector,
@@ -100,6 +99,7 @@ import {
     useSettingsSnapshot,
     useUserDetailsSnapshot,
 } from "ente-new/photos/components/utils/use-snapshot";
+import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import { shouldShowWhatsNew } from "ente-new/photos/services/changelog";
 import {
     addToCollection,

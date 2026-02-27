@@ -83,13 +83,13 @@ import {
     useSettingsSnapshot,
     useUserDetailsSnapshot,
 } from "ente-new/photos/components/utils/use-snapshot";
+import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import {
     PseudoCollectionID,
     type CollectionSummaries,
 } from "ente-new/photos/services/collection-summary";
 import exportService from "ente-new/photos/services/export";
 import { isMLSupported } from "ente-new/photos/services/ml";
-import { reauthenticateWithAppLock } from "ente-new/photos/services/app-lock";
 import {
     performSidebarAction as performSidebarRegistryAction,
     type SidebarActionContext,
@@ -998,7 +998,8 @@ const Account: React.FC<AccountProps> = ({
 
     const handleActiveSessions = useCallback(async () => {
         if (isDesktop) {
-            const didAuthenticateWithAppLock = await reauthenticateWithAppLock();
+            const didAuthenticateWithAppLock =
+                await reauthenticateWithAppLock();
             if (!didAuthenticateWithAppLock) await onAuthenticateUser();
         } else {
             await onAuthenticateUser();

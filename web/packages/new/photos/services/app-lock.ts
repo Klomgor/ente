@@ -499,7 +499,11 @@ const resolveDeviceLockCapability = async (): Promise<DeviceLockCapability> => {
  */
 export const shouldShowDeviceLockOption = async () => {
     const capability = await nativeDeviceLockCapability();
-    return capability.available || capability.reason !== "unsupported-platform";
+    if (capability.available) return true;
+
+    return (
+        nativeCapabilityUnavailableReason(capability) !== "unsupported-platform"
+    );
 };
 
 const clearPassphraseMaterial = async () =>
@@ -855,7 +859,9 @@ export const reauthenticateWithAppLock = async (): Promise<boolean> => {
 /**
  * Lock the app.
  */
-export const lock = (lockScreenMode: AppLockState["lockScreenMode"] = "lock") => {
+export const lock = (
+    lockScreenMode: AppLockState["lockScreenMode"] = "lock",
+) => {
     const snapshot = appLockState().snapshot;
     setSnapshot({ ...snapshot, lockScreenMode, isLocked: true });
     hydrateBruteForceStateIfNeeded();
