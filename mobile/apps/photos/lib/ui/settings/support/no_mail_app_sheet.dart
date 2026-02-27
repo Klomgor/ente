@@ -74,47 +74,69 @@ class NoMailAppSheet extends StatelessWidget {
           note: l10n.logsNotCopiedDownloadNote,
         ),
     ];
+    final maxSheetBodyHeight = MediaQuery.sizeOf(context).height * 0.75;
+    final estimatedSheetBodyHeight = 240 + (120 * copyFields.length);
+    final sheetBodyHeight = estimatedSheetBodyHeight > maxSheetBodyHeight
+        ? maxSheetBodyHeight
+        : estimatedSheetBodyHeight.toDouble();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          l10n.noEmailAppBody(email: toEmail),
-          style: getEnteTextTheme(context).smallMuted,
-        ),
-        const SizedBox(height: 16),
-        for (int i = 0; i < copyFields.length; i++) ...[
-          _CopyField(
-            data: copyFields[i],
-            onCopy: () async {
-              await Clipboard.setData(ClipboardData(text: copyFields[i].value));
+    return SizedBox(
+      height: sheetBodyHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.noEmailAppBody(email: toEmail),
+                    style: getEnteTextTheme(context).smallMuted,
+                  ),
+                  const SizedBox(height: 16),
+                  for (int i = 0; i < copyFields.length; i++) ...[
+                    _CopyField(
+                      data: copyFields[i],
+                      onCopy: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: copyFields[i].value),
+                        );
+                        if (context.mounted) {
+                          showShortToast(context, l10n.copied);
+                        }
+                      },
+                      onExport: copyFields[i].logsFilePath == null
+                          ? null
+                          : () async {
+                              await exportLogs(
+                                context,
+                                copyFields[i].logsFilePath!,
+                              );
+                            },
+                    ),
+                    if (i != copyFields.length - 1) const SizedBox(height: 12),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ButtonWidgetV2(
+            buttonType: ButtonTypeV2.primary,
+            labelText: l10n.copyAllToClipboard,
+            onTap: () async {
+              await Clipboard.setData(
+                ClipboardData(text: _buildCopyAllPayload(l10n)),
+              );
               if (context.mounted) {
                 showShortToast(context, l10n.copied);
               }
             },
-            onExport: copyFields[i].logsFilePath == null
-                ? null
-                : () async {
-                    await exportLogs(context, copyFields[i].logsFilePath!);
-                  },
           ),
-          if (i != copyFields.length - 1) const SizedBox(height: 12),
         ],
-        const SizedBox(height: 16),
-        ButtonWidgetV2(
-          buttonType: ButtonTypeV2.primary,
-          labelText: l10n.copyAllToClipboard,
-          onTap: () async {
-            await Clipboard.setData(
-              ClipboardData(text: _buildCopyAllPayload(l10n)),
-            );
-            if (context.mounted) {
-              showShortToast(context, l10n.copied);
-            }
-          },
-        ),
-      ],
+      ),
     );
   }
 
