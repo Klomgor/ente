@@ -54,6 +54,7 @@ const Page = () => {
                     sx={{
                         width: "100%",
                         maxWidth: { xs: "100%", md: 620 },
+                        minWidth: 0,
                         mx: "auto",
                     }}
                 >

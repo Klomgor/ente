@@ -11,13 +11,16 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
     <Box
         sx={{
             minHeight: "100dvh",
+            width: "100%",
+            maxWidth: "100%",
             bgcolor: "#2f6df7",
             fontFamily: '"Inter Variable", sans-serif',
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
+            alignItems: "stretch",
             p: { xs: 1.25, md: 2 },
             boxSizing: "border-box",
+            overflowX: "hidden",
         }}
     >
         <Box
@@ -29,12 +32,14 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
                 },
                 flex: 1,
                 width: "100%",
+                maxWidth: "100%",
                 bgcolor: "#0d1016",
                 borderRadius: { xs: "24px", md: "34px" },
                 display: "grid",
                 gridTemplateRows: "auto 1fr auto",
                 alignItems: "stretch",
                 boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.04)",
+                overflowX: "hidden",
                 "& ::selection": {
                     backgroundColor: "#2f6df7",
                     color: "#ffffff",

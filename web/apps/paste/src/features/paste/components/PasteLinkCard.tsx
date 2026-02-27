@@ -296,6 +296,9 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
             ref={linkCardRef}
             spacing={1}
             sx={{
+                width: "100%",
+                maxWidth: "100%",
+                minWidth: 0,
                 scrollMarginTop: {
                     xs: "16px",
                     md: "24px",
@@ -308,6 +311,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                     fontWeight: 600,
                     letterSpacing: "0.01em",
                     color: "rgba(220, 229, 255, 0.76)",
+                    maxWidth: "100%",
                 }}
             >
                 One-Time Link
@@ -316,12 +320,27 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1}
                 alignItems={{ xs: "stretch", sm: "center" }}
-                sx={{ minWidth: 0 }}
+                sx={{
+                    width: {
+                        xs: "calc(100vw - 4rem)",
+                        sm: "100%",
+                    },
+                    maxWidth: { xs: "24rem", sm: "100%" },
+                    minWidth: 0,
+                    mx: "auto",
+                    position: "relative",
+                    zIndex: 1,
+                }}
             >
                 <Box
                     sx={{
+                        width: "100%",
+                        maxWidth: "100%",
                         flex: 1,
                         minWidth: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        boxSizing: "border-box",
                         px: { xs: 1.9, sm: 2.2 },
                         py: { xs: 1.05, sm: 1.2 },
                         borderRadius: "14px",
@@ -330,6 +349,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                         backdropFilter: "blur(8px) saturate(108%)",
                         WebkitBackdropFilter: "blur(8px) saturate(108%)",
                         boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+                        overflow: "hidden",
                     }}
                 >
                     <Typography
@@ -341,32 +361,46 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                         sx={{
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
+                            justifyContent: { xs: "flex-start", md: "center" },
+                            height: "100%",
+                            width: "100%",
+                            maxWidth: "100%",
                             gap: 0.9,
                             minWidth: 0,
                             color: "rgba(244, 247, 255, 0.9)",
                             textDecoration: "none",
-                            fontSize: "0.93rem",
+                            fontSize: { xs: "0.9rem", sm: "0.93rem" },
                             lineHeight: 1.4,
-                            textAlign: "center",
+                            textAlign: "left",
                             overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
                             "&:hover": {
                                 textDecoration: "underline",
                                 color: "rgba(244, 247, 255, 1)",
                             },
                         }}
                     >
-                        <HugeiconsIcon
-                            icon={Link01Icon}
-                            size={17}
-                            strokeWidth={1.9}
-                        />
+                        <Box
+                            sx={{
+                                width: 20,
+                                height: 20,
+                                display: "grid",
+                                placeItems: "center",
+                                flexShrink: 0,
+                                alignSelf: "center",
+                            }}
+                        >
+                            <HugeiconsIcon
+                                icon={Link01Icon}
+                                size={17}
+                                strokeWidth={1.9}
+                            />
+                        </Box>
                         <Box
                             component="span"
                             sx={{
+                                flex: { xs: 1, md: "0 1 auto" },
                                 minWidth: 0,
+                                maxWidth: { md: "calc(100% - 28px)" },
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
@@ -377,24 +411,80 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                         </Box>
                     </Typography>
                 </Box>
+                {arrow && (
+                    <Box
+                        sx={{
+                            display: { xs: "block", sm: "none" },
+                            position: "absolute",
+                            left: { xs: 18 },
+                            top: "100%",
+                            mt: "-22px",
+                            width: 132,
+                            height: "auto",
+                            zIndex: 3,
+                            pointerEvents: "none",
+                            transform: "rotate(24deg)",
+                            transformOrigin: "50% 50%",
+                        }}
+                    >
+                        <svg
+                            viewBox={`0 0 ${arrow.width} ${arrow.height}`}
+                            width="100%"
+                            height="100%"
+                            fill="none"
+                            aria-hidden="true"
+                            focusable="false"
+                        >
+                            <g transform={arrow.transform}>
+                                {arrow.paths.map((path, idx) => (
+                                    <path
+                                        key={`${path.d}-mobile-${idx}`}
+                                        d={path.d}
+                                        fill="none"
+                                        stroke={path.color}
+                                        strokeWidth={path.width * path.strokeScale}
+                                        strokeLinecap={path.lineCap}
+                                        strokeLinejoin={path.lineJoin}
+                                    />
+                                ))}
+                            </g>
+                        </svg>
+                    </Box>
+                )}
             </Stack>
             <Box
                 sx={{
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "flex-start",
-                    gap: { xs: 0.75, sm: 1.1 },
-                    pl: { xs: 0, sm: 0.5 },
-                    mt: { xs: 0.8, sm: 1.1 },
+                    alignItems: { xs: "center", sm: "center" },
+                    justifyContent: {
+                        xs: "flex-start",
+                        sm: "flex-start",
+                        md: "center",
+                    },
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: { xs: 0.45, sm: 1.1 },
+                    pl: { xs: 0, sm: 0.5, md: 0 },
+                    mt: { xs: 2.5, sm: 1.1 },
                     opacity: 0.9,
+                    width: "100%",
+                    maxWidth: "100%",
+                    minWidth: 0,
+                    overflow: "visible",
                 }}
             >
                 {arrow && (
                     <Box
                         sx={{
-                            width: { xs: 132, sm: 178, md: 212 },
+                            display: { xs: "none", sm: "block" },
+                            width: { sm: 178, md: 212 },
                             height: "auto",
-                            transform: "rotate(28deg)",
+                            alignSelf: "auto",
+                            ml: 0,
+                            mt: { sm: 0.35, md: 0.25 },
+                            mb: { sm: 0, md: 0 },
+                            position: "relative",
+                            zIndex: 4,
+                            transform: "translateY(8px) rotate(28deg)",
                             transformOrigin: "50% 50%",
                             pointerEvents: "none",
                         }}
@@ -428,8 +518,16 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                 )}
                 <Stack
                     direction="row"
-                    spacing={{ xs: 2.7, sm: 3.2 }}
+                    spacing={{ xs: 1.2, sm: 3.2 }}
                     alignItems="flex-end"
+                    justifyContent={{ xs: "flex-start", sm: "flex-start" }}
+                    sx={{
+                        width: { xs: "100%", sm: "auto" },
+                        maxWidth: { xs: 220, sm: "none" },
+                        pl: { xs: 0, sm: 0 },
+                        mx: { xs: "auto", sm: 0 },
+                        transform: { xs: "translate(58px, 48px)", sm: "none" },
+                    }}
                 >
                     <Typography
                         component="button"
@@ -439,7 +537,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                         sx={{
                             fontFamily:
                                 '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
-                            fontSize: { xs: "2.3rem", sm: "2.5rem" },
+                            fontSize: { xs: "2rem", sm: "2.5rem" },
                             color: "#2f6df7",
                             background: "none",
                             border: "none",
@@ -449,7 +547,10 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                             cursor: "pointer",
                             textDecoration: "underline",
                             textUnderlineOffset: "3px",
-                            transform: { xs: "translateY(60px) rotate(-3deg)", sm: "translateY(68px) rotate(-4deg)" },
+                            transform: {
+                                xs: "translateX(20px) rotate(-3deg)",
+                                sm: "translateY(68px) rotate(-4deg)",
+                            },
                             "&:hover": {
                                 color: "#5d92ff",
                                 textDecoration: "underline",
@@ -461,11 +562,14 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                     </Typography>
                     <Box
                         sx={{
-                            transform: { xs: "translateY(86px) rotate(3deg)", sm: "translateY(94px) rotate(4deg)" },
+                            transform: {
+                                xs: "rotate(3deg)",
+                                sm: "translateY(94px) rotate(4deg)",
+                            },
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            minWidth: 84,
+                            minWidth: { xs: 72, sm: 84 },
                         }}
                     >
                         <Typography
@@ -474,7 +578,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                             sx={{
                                 fontFamily:
                                     '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
-                                fontSize: { xs: "2.3rem", sm: "2.5rem" },
+                                fontSize: { xs: "2rem", sm: "2.5rem" },
                                 color: "#2f6df7",
                                 background: "none",
                                 border: "none",
