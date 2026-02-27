@@ -10,6 +10,11 @@
  */
 
 import { deriveInteractiveKey, deriveKey } from "ente-base/crypto";
+import {
+    clearMainWindowBlurSuppression,
+    shouldSuppressMainWindowBlur,
+    suppressMainWindowBlurForTrustedPrompt,
+} from "ente-base/electron";
 import { getKVN, getKVS, removeKV, setKV } from "ente-base/kv";
 import log from "ente-base/log";
 import { haveMasterKeyInSession } from "ente-base/session";
@@ -151,7 +156,6 @@ const cooldownStartsAtAttempt = 5;
 const cooldownBaseSeconds = 30;
 const unlockAttemptLockName = "ente-app-lock-unlock-attempt";
 const trustedPromptAutoLockSuppressionMs = 5 * 1e3;
-let suppressAutoLockOnBlurUntil = 0;
 
 /**
  * Temporarily suppress auto-lock on blur for trusted app-initiated prompts.
@@ -160,23 +164,20 @@ let suppressAutoLockOnBlurUntil = 0;
  * blur the app window even though the user hasn't backgrounded the app.
  */
 export const suppressAutoLockOnBlurForTrustedPrompt = () => {
-    suppressAutoLockOnBlurUntil = Math.max(
-        suppressAutoLockOnBlurUntil,
-        Date.now() + trustedPromptAutoLockSuppressionMs,
-    );
+    suppressMainWindowBlurForTrustedPrompt(trustedPromptAutoLockSuppressionMs);
 };
 
 /**
  * Return true if blur-triggered auto-lock should currently be suppressed.
  */
 export const shouldSuppressAutoLockOnBlur = () =>
-    Date.now() < suppressAutoLockOnBlurUntil;
+    shouldSuppressMainWindowBlur();
 
 /**
  * Clear any pending blur auto-lock suppression.
  */
 export const clearAutoLockBlurSuppression = () => {
-    suppressAutoLockOnBlurUntil = 0;
+    clearMainWindowBlurSuppression();
 };
 
 export type DeviceLockMode = "native";

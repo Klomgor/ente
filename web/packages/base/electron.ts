@@ -24,6 +24,33 @@ export const ensureElectron = (): Electron => {
     );
 };
 
+const defaultTrustedWindowBlurSuppressionMs = 5 * 1e3;
+let suppressMainWindowBlurUntil = 0;
+
+/**
+ * Temporarily suppress blur handling for trusted app-initiated native prompts.
+ *
+ * Native OS dialogs can blur the window without indicating user backgrounding
+ * intent (for example, directory pickers). Consumers can gate blur-driven
+ * actions during this short window.
+ */
+export const suppressMainWindowBlurForTrustedPrompt = (
+    durationMs = defaultTrustedWindowBlurSuppressionMs,
+) => {
+    if (durationMs <= 0) return;
+    suppressMainWindowBlurUntil = Math.max(
+        suppressMainWindowBlurUntil,
+        Date.now() + durationMs,
+    );
+};
+
+export const shouldSuppressMainWindowBlur = () =>
+    Date.now() < suppressMainWindowBlurUntil;
+
+export const clearMainWindowBlurSuppression = () => {
+    suppressMainWindowBlurUntil = 0;
+};
+
 type MainWindowFocusListener = () => void;
 type MainWindowBlurListener = () => void;
 
