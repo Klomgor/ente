@@ -34,6 +34,12 @@ export const PasteCreatePanel = ({
     const isNearCharLimit = inputText.length >= nearLimitThreshold;
     const mutedCounterColor = "rgba(234, 238, 255, 0.6)";
     const softBlueCounterColor = "rgba(204, 224, 255, 0.96)";
+    const privacyPills = [
+        "Private",
+        "End To End Encrypted",
+        "One-Time View",
+        "Deletes In 24 Hrs",
+    ];
 
     return (
         <>
@@ -104,9 +110,10 @@ export const PasteCreatePanel = ({
                     left: 18,
                     right: 18,
                     bottom: 18,
+                    height: 48,
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center",
+                    alignItems: "flex-end",
                     gap: 2,
                     pointerEvents: "none",
                 }}
@@ -117,6 +124,7 @@ export const PasteCreatePanel = ({
                         display: "flex",
                         alignItems: "center",
                         height: 44,
+                        transform: { xs: "translateY(10px)", md: "translateY(12px)" },
                         color: mutedCounterColor,
                         fontWeight: 600,
                         lineHeight: 1,
@@ -189,44 +197,43 @@ export const PasteCreatePanel = ({
                 textAlign: "center",
             }}
         >
-            <Typography
+            <Box
                 sx={{
-                    color: "rgba(220, 229, 255, 0.62)",
-                    fontSize: "0.86rem",
-                    fontWeight: 500,
-                    lineHeight: 1.4,
-                    maxWidth: 520,
+                    display: "flex",
+                    flexWrap: { xs: "wrap", md: "nowrap" },
+                    justifyContent: "center",
+                    gap: 1,
+                    maxWidth: { xs: 520, md: "none" },
                     mb: "3rem",
+                    pointerEvents: "none",
+                    userSelect: "none",
                 }}
             >
-                Your paste is{" "}
-                <Box
-                    component="span"
-                    sx={{ fontWeight: 700, color: "rgba(232, 240, 255, 0.9)" }}
-                >
-                    private
-                </Box>
-                .{" "}
-                <Box
-                    component="span"
-                    sx={{ fontWeight: 700, color: "rgba(232, 240, 255, 0.9)" }}
-                >
-                    End-to-end encrypted
-                </Box>
-                ,{" "}
-                <Box component="span" sx={{ color: frameBlue, fontWeight: 600 }}>
-                    one-time view
-                </Box>
-                ,{" "}
-                <Box component="span" sx={{ color: frameBlue, fontWeight: 600 }}>
-                    purged after view
-                </Box>{" "}
-                and{" "}
-                <Box component="span" sx={{ color: frameBlue, fontWeight: 600 }}>
-                    auto-deleted in 24 hours
-                </Box>
-                .
-            </Typography>
+                {privacyPills.map((label) => (
+                    <Box
+                        key={label}
+                        component="span"
+                        aria-disabled="true"
+                        sx={{
+                            px: 1.4,
+                            py: 0.6,
+                            borderRadius: "999px",
+                            border: "1px solid rgba(147, 155, 177, 0.24)",
+                            bgcolor: "rgba(255, 255, 255, 0.045)",
+                            color: "rgba(220, 229, 255, 0.55)",
+                            fontSize: "0.79rem",
+                            fontWeight: 600,
+                            letterSpacing: "0.01em",
+                            lineHeight: 1.2,
+                            whiteSpace: "nowrap",
+                            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.05)",
+                            opacity: 0.78,
+                        }}
+                    >
+                        {label}
+                    </Box>
+                ))}
+            </Box>
         </Box>
 
         {createError && <Typography color="error">{createError}</Typography>}

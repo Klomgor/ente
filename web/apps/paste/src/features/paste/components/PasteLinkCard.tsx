@@ -152,6 +152,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
     const linkCardRef = useRef<HTMLDivElement | null>(null);
     const arrowSvgRef = useRef<SVGSVGElement | null>(null);
     const [arrow, setArrow] = useState<ParsedArrow | null>(null);
+    const [showCopied, setShowCopied] = useState(false);
 
     useEffect(() => {
         const linkCard = linkCardRef.current;
@@ -269,6 +270,27 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
         };
     }, [arrow]);
 
+    useEffect(() => {
+        if (!showCopied) return;
+        const timeoutId = window.setTimeout(() => {
+            setShowCopied(false);
+        }, 1400);
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [showCopied]);
+
+    const handleCopyClick = () => {
+        setShowCopied(false);
+        void onCopy(link)
+            .then(() => {
+                setShowCopied(true);
+            })
+            .catch(() => {
+                setShowCopied(false);
+            });
+    };
+
     return (
         <Stack
             ref={linkCardRef}
@@ -280,6 +302,16 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                 },
             }}
         >
+            <Typography
+                sx={{
+                    fontSize: "0.88rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.01em",
+                    color: "rgba(220, 229, 255, 0.76)",
+                }}
+            >
+                One-Time Link
+            </Typography>
             <Stack
                 direction={{ xs: "column", sm: "row" }}
                 spacing={1}
@@ -408,17 +440,18 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                             fontFamily:
                                 '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
                             fontSize: { xs: "2.3rem", sm: "2.5rem" },
-                            color: "rgba(219, 232, 255, 0.94)",
+                            color: "#2f6df7",
                             background: "none",
                             border: "none",
                             p: 0,
                             m: 0,
                             lineHeight: 1,
                             cursor: "pointer",
-                            textDecoration: "none",
-                            transform: { xs: "translateY(-3px) rotate(-3deg)", sm: "translateY(-4px) rotate(-4deg)" },
+                            textDecoration: "underline",
+                            textUnderlineOffset: "3px",
+                            transform: { xs: "translateY(60px) rotate(-3deg)", sm: "translateY(68px) rotate(-4deg)" },
                             "&:hover": {
-                                color: "#2f6df7",
+                                color: "#5d92ff",
                                 textDecoration: "underline",
                                 textUnderlineOffset: "3px",
                             },
@@ -426,33 +459,60 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                     >
                         Share
                     </Typography>
-                    <Typography
-                        component="button"
-                        onClick={() => {
-                            void onCopy(link);
-                        }}
+                    <Box
                         sx={{
-                            fontFamily:
-                                '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
-                            fontSize: { xs: "2.3rem", sm: "2.5rem" },
-                            color: "rgba(219, 232, 255, 0.94)",
-                            background: "none",
-                            border: "none",
-                            p: 0,
-                            m: 0,
-                            lineHeight: 1,
-                            cursor: "pointer",
-                            textDecoration: "none",
-                            transform: { xs: "translateY(5px) rotate(3deg)", sm: "translateY(6px) rotate(4deg)" },
-                            "&:hover": {
-                                color: "#2f6df7",
-                                textDecoration: "underline",
-                                textUnderlineOffset: "3px",
-                            },
+                            transform: { xs: "translateY(86px) rotate(3deg)", sm: "translateY(94px) rotate(4deg)" },
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            minWidth: 84,
                         }}
                     >
-                        Copy
-                    </Typography>
+                        <Typography
+                            component="button"
+                            onClick={handleCopyClick}
+                            sx={{
+                                fontFamily:
+                                    '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
+                                fontSize: { xs: "2.3rem", sm: "2.5rem" },
+                                color: "#2f6df7",
+                                background: "none",
+                                border: "none",
+                                p: 0,
+                                m: 0,
+                                lineHeight: 1,
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                textUnderlineOffset: "3px",
+                                "&:hover": {
+                                    color: "#5d92ff",
+                                    textDecoration: "underline",
+                                    textUnderlineOffset: "3px",
+                                },
+                            }}
+                        >
+                            Copy
+                        </Typography>
+                        <Typography
+                            variant="mini"
+                            sx={{
+                                fontFamily:
+                                    '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
+                                mt: 0.5,
+                                minHeight: "1.1rem",
+                                color: "rgba(182, 190, 208, 0.9)",
+                                fontSize: "0.94rem",
+                                fontWeight: 600,
+                                lineHeight: 1,
+                                letterSpacing: "0.06em",
+                                opacity: showCopied ? 1 : 0,
+                                transition: "opacity 150ms ease",
+                                pointerEvents: "none",
+                            }}
+                        >
+                            Copied to clipboard.
+                        </Typography>
+                    </Box>
                 </Stack>
             </Box>
         </Stack>
