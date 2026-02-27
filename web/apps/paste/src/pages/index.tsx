@@ -3,7 +3,6 @@ import Head from "next/head";
 import { PasteCreatePanel } from "features/paste/components/PasteCreatePanel";
 import { PasteFooter } from "features/paste/components/PasteFooter";
 import { PasteFrame } from "features/paste/components/PasteFrame";
-import { PasteHero } from "features/paste/components/PasteHero";
 import { PasteViewPanel } from "features/paste/components/PasteViewPanel";
 import { useConsumePaste } from "features/paste/hooks/useConsumePaste";
 import { useCreatePaste } from "features/paste/hooks/useCreatePaste";
@@ -37,12 +36,27 @@ const Page = () => {
                     name="description"
                     content="Share sensitive text with one-time, end-to-end encrypted links that auto-expire after 24 hours."
                 />
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link
+                    rel="preconnect"
+                    href="https://fonts.gstatic.com"
+                    crossOrigin="anonymous"
+                />
+                <link
+                    href="https://fonts.googleapis.com/css2?family=Gochi+Hand&display=swap"
+                    rel="stylesheet"
+                />
             </Head>
 
             <PasteFrame footer={<PasteFooter />}>
-                <Stack spacing={2.5}>
-                    <PasteHero />
-
+                <Stack
+                    spacing={2.5}
+                    sx={{
+                        width: "100%",
+                        maxWidth: { xs: "100%", md: 620 },
+                        mx: "auto",
+                    }}
+                >
                     {mode === "create" && (
                         <PasteCreatePanel
                             inputText={inputText}

@@ -1,4 +1,5 @@
-import { Box } from "@mui/material";
+import GitHubIcon from "@mui/icons-material/GitHub";
+import { Box, IconButton, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 
 interface PasteFrameProps {
@@ -10,57 +11,106 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
     <Box
         sx={{
             minHeight: "100dvh",
-            bgcolor: "accent.main",
+            bgcolor: "#2f6df7",
+            fontFamily: '"Inter Variable", sans-serif',
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            p: { xs: 1, md: 3 },
+            p: { xs: 1.25, md: 2 },
             boxSizing: "border-box",
         }}
     >
         <Box
             sx={{
+                position: "relative",
                 minHeight: {
-                    xs: "calc(100dvh - 16px)",
-                    md: "calc(100dvh - 48px)",
+                    xs: "calc(100dvh - 20px)",
+                    md: "calc(100dvh - 32px)",
                 },
                 flex: 1,
                 width: "100%",
-                bgcolor: "background.default",
-                borderRadius: { xs: "20px", md: "40px" },
+                bgcolor: "#0d1016",
+                borderRadius: { xs: "24px", md: "34px" },
                 display: "grid",
-                gridTemplateRows: "1fr auto",
+                gridTemplateRows: "auto 1fr auto",
                 alignItems: "stretch",
+                boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.04)",
                 "& ::selection": {
-                    backgroundColor: "accent.main",
-                    color: "fixed.white",
+                    backgroundColor: "#2f6df7",
+                    color: "#ffffff",
                 },
                 "& ::-moz-selection": {
-                    backgroundColor: "accent.main",
-                    color: "fixed.white",
+                    backgroundColor: "#2f6df7",
+                    color: "#ffffff",
                 },
             }}
         >
             <Box
                 sx={{
                     width: "100%",
-                    maxWidth: 760,
-                    mx: "auto",
-                    px: { xs: 3, md: 5 },
-                    pb: { xs: 2, md: 2.5 },
-                    mt: { xs: 4, md: 5 },
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    px: { xs: 3, md: 4.5 },
+                    pt: { xs: 3, md: 3.5 },
                 }}
             >
-                {children}
+                <Typography
+                    sx={{
+                        fontSize: { xs: "1.5rem", md: "1.75rem" },
+                        lineHeight: 1.05,
+                        fontWeight: 700,
+                        color: "#f4f7ff",
+                    }}
+                >
+                    Ente Paste
+                </Typography>
+                <IconButton
+                    component="a"
+                    href="https://github.com/ente-io/ente"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View source on GitHub"
+                    sx={{
+                        width: 42,
+                        height: 42,
+                        bgcolor: "transparent",
+                        color: "#f4f7ff",
+                        "&:hover": {
+                            bgcolor: "rgba(255, 255, 255, 0.12)",
+                        },
+                    }}
+                >
+                    <GitHubIcon sx={{ fontSize: 30 }} />
+                </IconButton>
             </Box>
             <Box
                 sx={{
                     width: "100%",
-                    maxWidth: 760,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    px: { xs: 3, md: 5 },
+                    py: { xs: 2, md: 3 },
+                }}
+            >
+                <Box
+                    sx={{
+                        width: "100%",
+                        maxWidth: 700,
+                    }}
+                >
+                    {children}
+                </Box>
+            </Box>
+            <Box
+                sx={{
+                    width: "100%",
+                    maxWidth: 700,
                     mx: "auto",
                     px: { xs: 3, md: 5 },
                     pt: { xs: 2, md: 2.5 },
-                    pb: { xs: 3, md: 3.5 },
+                    pb: { xs: 3, md: 3.25 },
                 }}
             >
                 {footer}

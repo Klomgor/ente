@@ -7,7 +7,7 @@ const footerLinkStyle = {
 };
 
 export const PasteFooter = () => (
-    <Stack spacing={1.25} alignItems="center">
+    <Stack spacing={1.1} alignItems="center">
         <a
             href="https://ente.io"
             target="_blank"
@@ -21,16 +21,22 @@ export const PasteFooter = () => (
         >
             <Box
                 sx={{
-                    color: "accent.main",
-                    "& svg": { color: "accent.main" },
-                    "& svg path": { fill: "accent.main" },
+                    color: "#2f6df7",
+                    "& svg": { color: "#2f6df7" },
+                    "& svg path": { fill: "#2f6df7" },
                 }}
             >
-                <EnteLogo height={20} />
+                <EnteLogo height={28} />
             </Box>
         </a>
 
-        <Typography variant="mini" color="text.muted">
+        <Typography
+            variant="mini"
+            sx={{
+                color: "rgba(230, 236, 255, 0.56)",
+                fontWeight: 600,
+            }}
+        >
             <a
                 href="https://ente.io/photos"
                 target="_blank"
