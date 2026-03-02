@@ -34,7 +34,6 @@ export const useCreatePaste = () => {
             );
             const response = await createPaste(payload);
             setCreatedLink(buildPasteLink(response.accessToken, fragmentSecret));
-            setInputText("");
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : "Failed to create paste";
