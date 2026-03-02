@@ -735,7 +735,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
           detection: detection,
           blurValue: face.blurValue,
           alignment: alignment,
-          embedding: face.embedding.toList(growable: false),
+          embedding: face.embedding,
         );
       }).toList(growable: false);
     }
@@ -747,7 +747,7 @@ Future<MLResult> analyzeImageRust(Map args) async {
       }
       result.clip = ClipResult(
         fileID: enteFileID,
-        embedding: rustClip.embedding.toList(growable: false),
+        embedding: rustClip.embedding,
       );
     }
 
