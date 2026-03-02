@@ -12,7 +12,8 @@ export const useConsumePaste = (mode: PageMode, accessToken: string | null) => {
     const startedConsumeRef = useRef(false);
 
     useEffect(() => {
-        if (mode !== "view" || !accessToken || startedConsumeRef.current) return;
+        if (mode !== "view" || !accessToken || startedConsumeRef.current)
+            return;
         startedConsumeRef.current = true;
 
         const run = async () => {
@@ -36,7 +37,9 @@ export const useConsumePaste = (mode: PageMode, accessToken: string | null) => {
                 setResolvedText(decryptedText);
             } catch (error) {
                 const message =
-                    error instanceof Error ? error.message : "Paste is unavailable";
+                    error instanceof Error
+                        ? error.message
+                        : "Paste is unavailable";
                 setConsumeError(message);
             } finally {
                 setConsuming(false);
@@ -46,9 +49,5 @@ export const useConsumePaste = (mode: PageMode, accessToken: string | null) => {
         void run();
     }, [mode, accessToken]);
 
-    return {
-        consuming,
-        consumeError,
-        resolvedText,
-    };
+    return { consuming, consumeError, resolvedText };
 };

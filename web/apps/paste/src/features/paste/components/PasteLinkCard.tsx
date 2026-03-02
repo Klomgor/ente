@@ -694,7 +694,7 @@ export const PasteLinkCard = ({
                                 textAlign: "center",
                             }}
                         >
-                            Open one-time link?
+                            Open One-Time Link?
                         </Typography>
                         <Typography
                             sx={{
@@ -705,8 +705,8 @@ export const PasteLinkCard = ({
                                 textAlign: "center",
                             }}
                         >
-                            This link can be opened only once. Not ready yet?
-                            Copy the link instead.
+                            This link can be opened only once. Are you sure you
+                            want to open it? You could copy it instead.
                         </Typography>
                         <Stack
                             direction="row"

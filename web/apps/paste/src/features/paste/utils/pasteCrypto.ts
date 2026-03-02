@@ -36,7 +36,10 @@ export const encryptPasteForCreate = async (text: string) => {
     };
 };
 
-const resolvePasteKey = async (fragmentSecret: string, payload: PastePayload) => {
+const resolvePasteKey = async (
+    fragmentSecret: string,
+    payload: PastePayload,
+) => {
     if (!FRAGMENT_SECRET_PATTERN.test(fragmentSecret)) {
         throw new Error("Invalid key in URL");
     }

@@ -21,22 +21,23 @@ export const useCreatePaste = () => {
         }
 
         if (inputText.length > MAX_PASTE_CHARS) {
-            setCreateError(
-                `Paste is limited to ${MAX_PASTE_CHARS} characters`,
-            );
+            setCreateError(`Paste is limited to ${MAX_PASTE_CHARS} characters`);
             return;
         }
 
         setCreating(true);
         try {
-            const { fragmentSecret, payload } = await encryptPasteForCreate(
-                inputText,
-            );
+            const { fragmentSecret, payload } =
+                await encryptPasteForCreate(inputText);
             const response = await createPaste(payload);
-            setCreatedLink(buildPasteLink(response.accessToken, fragmentSecret));
+            setCreatedLink(
+                buildPasteLink(response.accessToken, fragmentSecret),
+            );
         } catch (error) {
             const message =
-                error instanceof Error ? error.message : "Failed to create paste";
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create paste";
             setCreateError(message);
         } finally {
             setCreating(false);

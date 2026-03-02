@@ -27,7 +27,9 @@ export interface ParsedArrow {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
-const toRecordArray = (value: unknown): Record<string, unknown>[] | undefined => {
+const toRecordArray = (
+    value: unknown,
+): Record<string, unknown>[] | undefined => {
     if (!Array.isArray(value)) return undefined;
 
     const records: Record<string, unknown>[] = [];
@@ -86,12 +88,7 @@ const toShapePath = (value: unknown): LottieShapePath | null => {
     const v = toPoints(value.v);
     if (!i || !o || !v) return null;
 
-    return {
-        c: value.c === true,
-        i,
-        o,
-        v,
-    };
+    return { c: value.c === true, i, o, v };
 };
 
 const safePoint = (point?: LottiePoint): [number, number] => [
@@ -177,7 +174,8 @@ export const parseArrowLottie = (lottie: unknown): ParsedArrow | null => {
         : undefined;
 
     const sx = (toNumber(scaleValues?.[0], 100) || 100) / 100;
-    const sy = (toNumber(scaleValues?.[1], scaleValues?.[0] ?? 100) || 100) / 100;
+    const sy =
+        (toNumber(scaleValues?.[1], scaleValues?.[0] ?? 100) || 100) / 100;
     const px = toNumber(positionValues?.[0], 0) || 0;
     const py = toNumber(positionValues?.[1], 0) || 0;
 

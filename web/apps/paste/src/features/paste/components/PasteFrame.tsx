@@ -82,9 +82,7 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
                         height: 42,
                         bgcolor: "transparent",
                         color: "#f4f7ff",
-                        "&:hover": {
-                            bgcolor: "rgba(255, 255, 255, 0.12)",
-                        },
+                        "&:hover": { bgcolor: "rgba(255, 255, 255, 0.12)" },
                     }}
                 >
                     <GitHubIcon sx={{ fontSize: 30 }} />
@@ -100,14 +98,7 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
                     py: { xs: 2, md: 3 },
                 }}
             >
-                <Box
-                    sx={{
-                        width: "100%",
-                        maxWidth: 700,
-                    }}
-                >
-                    {children}
-                </Box>
+                <Box sx={{ width: "100%", maxWidth: 700 }}>{children}</Box>
             </Box>
             <Box
                 sx={{

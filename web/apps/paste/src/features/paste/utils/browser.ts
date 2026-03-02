@@ -20,9 +20,7 @@ export const copyTextToClipboard = async (value: string) => {
 
 export const shareUrlOrCopy = async (url: string) => {
     const share = (
-        navigator as Navigator & {
-            share?: (data?: ShareData) => Promise<void>;
-        }
+        navigator as Navigator & { share?: (data?: ShareData) => Promise<void> }
     ).share;
 
     if (typeof share !== "function") {

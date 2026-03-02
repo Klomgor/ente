@@ -28,7 +28,10 @@ const isFinderModule = (x: number, y: number, size: number) => {
 
 export const createQrSvgData = (value: string): QrSvgData | null => {
     try {
-        const qr = qrcodegen.QrCode.encodeText(value, qrcodegen.QrCode.Ecc.MEDIUM);
+        const qr = qrcodegen.QrCode.encodeText(
+            value,
+            qrcodegen.QrCode.Ecc.MEDIUM,
+        );
         const modules: QrModule[] = [];
 
         for (let y = 0; y < qr.size; y++) {
@@ -42,10 +45,7 @@ export const createQrSvgData = (value: string): QrSvgData | null => {
             }
         }
 
-        return {
-            modules,
-            viewBoxSize: qr.size + QR_BORDER_MODULES * 2,
-        };
+        return { modules, viewBoxSize: qr.size + QR_BORDER_MODULES * 2 };
     } catch {
         return null;
     }

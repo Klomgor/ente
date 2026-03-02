@@ -1,6 +1,6 @@
-import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import {
     Box,
     Button,
@@ -87,9 +87,7 @@ export const PasteViewPanel = ({
                         icon={Alert02Icon}
                         size={56}
                         strokeWidth={2}
-                        style={{
-                            color: "rgba(180, 198, 232, 0.76)",
-                        }}
+                        style={{ color: "rgba(180, 198, 232, 0.76)" }}
                     />
                     <Stack spacing={{ xs: 2.2, md: 2.6 }} alignItems="center">
                         <Typography
