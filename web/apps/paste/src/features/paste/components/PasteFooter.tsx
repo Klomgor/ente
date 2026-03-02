@@ -1,15 +1,9 @@
 import { Box, Stack, Typography } from "@mui/material";
-import { EnteLogo } from "ente-base/components/EnteLogo";
-
-const footerLinkStyle = {
-    color: "inherit",
-    textDecoration: "none",
-};
 
 export const PasteFooter = () => (
-    <Stack spacing={1.1} alignItems="center">
+    <Stack spacing={1.3} alignItems="center">
         <a
-            href="https://ente.io"
+            href="https://ente.io?utm_source=paste"
             target="_blank"
             rel="noopener"
             style={{
@@ -20,49 +14,30 @@ export const PasteFooter = () => (
             }}
         >
             <Box
+                component="img"
+                src="/images/big3.png"
+                alt="Other Ente apps"
                 sx={{
-                    color: "#2f6df7",
-                    "& svg": { color: "#2f6df7" },
-                    "& svg path": { fill: "#2f6df7" },
+                    display: "block",
+                    width: { xs: 132, sm: 148 },
+                    maxWidth: "38vw",
+                    height: "auto",
                 }}
-            >
-                <EnteLogo height={28} />
-            </Box>
+            />
         </a>
 
         <Typography
             variant="mini"
             sx={{
                 color: "rgba(230, 236, 255, 0.56)",
-                fontWeight: 600,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                fontSize: { xs: "0.58rem", sm: "0.62rem" },
+                textAlign: "center",
             }}
         >
-            <a
-                href="https://ente.io/photos"
-                target="_blank"
-                rel="noopener"
-                style={footerLinkStyle}
-            >
-                Photos
-            </a>{" "}
-            {"\u2022"}{" "}
-            <a
-                href="https://ente.io/locker"
-                target="_blank"
-                rel="noopener"
-                style={footerLinkStyle}
-            >
-                Documents
-            </a>{" "}
-            {"\u2022"}{" "}
-            <a
-                href="https://ente.io/auth"
-                target="_blank"
-                rel="noopener"
-                style={footerLinkStyle}
-            >
-                Auth Codes
-            </a>
+            THE ENTE E2EE ECOSYSTEM
         </Typography>
     </Stack>
 );
