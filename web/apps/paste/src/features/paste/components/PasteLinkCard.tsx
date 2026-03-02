@@ -127,9 +127,7 @@ export const PasteLinkCard = ({
                     path,
                 };
             })
-            .filter(
-                (item): item is MeasuredPath => item.parsed !== undefined,
-            );
+            .filter((item): item is MeasuredPath => item.parsed !== undefined);
 
         for (const { path, len, parsed } of measured) {
             const isSecondaryStroke = /shape\s*2/i.test(parsed.name);
@@ -333,9 +331,7 @@ export const PasteLinkCard = ({
                             display: { xs: "block", sm: "none" },
                             position: "absolute",
                             left: { xs: 18 },
-                            "@media (max-width:449.95px)": {
-                                left: 6,
-                            },
+                            "@media (max-width:449.95px)": { left: 6 },
                             top: "100%",
                             mt: "-22px",
                             width: 132,

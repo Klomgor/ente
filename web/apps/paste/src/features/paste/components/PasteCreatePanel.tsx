@@ -1,6 +1,12 @@
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
+import {
+    Box,
+    CircularProgress,
+    IconButton,
+    TextField,
+    Typography,
+} from "@mui/material";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { MAX_PASTE_CHARS } from "../constants";
 import { PasteLinkCard } from "./PasteLinkCard";
@@ -45,7 +51,7 @@ export const PasteCreatePanel = ({
     ];
 
     return (
-        <>
+        <Box sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
             <Box
                 sx={{
                     position: "relative",
@@ -84,7 +90,8 @@ export const PasteCreatePanel = ({
                                 // Keep only the minimum reserve needed for the footer row.
                                 paddingBottom: { xs: "50px", sm: "56px" },
                                 backdropFilter: "blur(9px) saturate(112%)",
-                                WebkitBackdropFilter: "blur(9px) saturate(112%)",
+                                WebkitBackdropFilter:
+                                    "blur(9px) saturate(112%)",
                                 background:
                                     "linear-gradient(160deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 58%, rgba(255, 255, 255, 0.015) 100%)",
                                 boxShadow:
@@ -210,7 +217,7 @@ export const PasteCreatePanel = ({
             </Box>
             <Box
                 sx={{
-                    mt: { xs: "72px", sm: "84px", md: "116px" },
+                    mt: { xs: "16px" },
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -260,10 +267,12 @@ export const PasteCreatePanel = ({
                 </Box>
             </Box>
 
-            {createError && <Typography color="error">{createError}</Typography>}
+            {createError && (
+                <Typography color="error">{createError}</Typography>
+            )}
 
             {createdLink && (
-                <Box sx={{ mt: { xs: 4.4, sm: 5.2 }, width: "100%", minWidth: 0 }}>
+                <Box sx={{ mt: 0, width: "100%", minWidth: 0 }}>
                     <PasteLinkCard
                         link={createdLink}
                         onCopy={onCopyLink}
@@ -271,6 +280,6 @@ export const PasteCreatePanel = ({
                     />
                 </Box>
             )}
-        </>
+        </Box>
     );
 };
