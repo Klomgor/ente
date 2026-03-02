@@ -270,6 +270,59 @@ cleanup_resources() {
 
 trap cleanup_resources EXIT
 
+ensure_goldens_python_runtime_deps() {
+  if ! command -v uv >/dev/null 2>&1; then
+    echo "Python golden generation requires uv, but uv is unavailable." >&2
+    return 1
+  fi
+
+  local venv_python="$UV_PROJECT_DIR/.venv/bin/python"
+  if [[ ! -x "$venv_python" ]]; then
+    echo "Initializing Python environment for parity goldens"
+    if ! uv run --project "$UV_PROJECT_DIR" --no-sync python -c "import sys" >/dev/null 2>&1; then
+      echo "Failed to initialize Python environment for parity goldens." >&2
+      return 1
+    fi
+  fi
+
+  local missing_modules=""
+  missing_modules="$(
+    "$venv_python" - <<'PY'
+import importlib.util
+
+required_modules = ("cv2", "onnxruntime", "requests", "numpy", "PIL", "pillow_heif")
+missing = [module for module in required_modules if importlib.util.find_spec(module) is None]
+print(" ".join(missing))
+PY
+  )"
+
+  if [[ -z "$missing_modules" ]]; then
+    return 0
+  fi
+
+  echo "Installing missing Python parity runtime dependencies (modules: $missing_modules)"
+  if ! uv pip install --python "$venv_python" opencv-python onnxruntime requests pillow-heif; then
+    echo "Failed to install Python parity runtime dependencies." >&2
+    return 1
+  fi
+
+  if ! "$venv_python" - <<'PY'
+import importlib.util
+import sys
+
+required_modules = ("cv2", "onnxruntime", "requests", "numpy", "PIL", "pillow_heif")
+missing = [module for module in required_modules if importlib.util.find_spec(module) is None]
+if missing:
+    print(f"Missing Python parity runtime modules after installation: {', '.join(missing)}", file=sys.stderr)
+    sys.exit(1)
+PY
+  then
+    return 1
+  fi
+
+  return 0
+}
+
 reserve_localhost_port() {
   python3 <<'PY'
 import socket
@@ -1185,6 +1238,12 @@ if $has_mobile_platform; then
   if ! start_local_mirror_server "$ML_DIR" "$LOCAL_MIRROR_LOG"; then
     echo "Proceeding without local parity mirror."
   fi
+fi
+
+echo "Ensuring Python runtime dependencies for goldens are available"
+if ! ensure_goldens_python_runtime_deps; then
+  echo "Python dependency preflight failed; parity output not generated." >&2
+  exit 1
 fi
 
 echo "Generating Python goldens"
