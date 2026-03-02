@@ -1,5 +1,5 @@
 import GitHubIcon from "@mui/icons-material/GitHub";
-import { Box, IconButton, Typography } from "@mui/material";
+import { Box, IconButton } from "@mui/material";
 import type { ReactNode } from "react";
 
 interface PasteFrameProps {
@@ -60,16 +60,17 @@ export const PasteFrame = ({ children, footer }: PasteFrameProps) => (
                     pt: { xs: 3, md: 3.5 },
                 }}
             >
-                <Typography
+                <Box
+                    component="img"
+                    src="/images/pastelogo.png"
+                    alt="Ente Paste"
                     sx={{
-                        fontSize: { xs: "1.5rem", md: "1.75rem" },
-                        lineHeight: 1.05,
-                        fontWeight: 700,
-                        color: "#f4f7ff",
+                        display: "block",
+                        width: "auto",
+                        height: { xs: 34, md: 40 },
+                        maxWidth: { xs: 220, md: 260 },
                     }}
-                >
-                    Ente Paste
-                </Typography>
+                />
                 <IconButton
                     component="a"
                     href="https://github.com/ente-io/ente"

@@ -70,11 +70,11 @@ export const PasteLinkCard = ({
                 const response = await fetch("/arrow.json");
                 if (!response.ok) return;
 
-                const json = await response.json();
+                const json: unknown = await response.json();
                 if (cancelled) return;
 
                 const parsed = parseArrowLottie(json);
-                if (!cancelled) setArrow(parsed);
+                setArrow(parsed);
             } catch {
                 // No-op: The link row works without the hint animation.
             }
@@ -113,8 +113,7 @@ export const PasteLinkCard = ({
                 };
             })
             .filter(
-                (item): item is MeasuredPath =>
-                    item.parsed !== undefined && item.parsed !== null,
+                (item): item is MeasuredPath => item.parsed !== undefined,
             );
 
         for (const { path, len, parsed } of measured) {
