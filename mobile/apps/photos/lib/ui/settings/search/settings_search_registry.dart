@@ -245,6 +245,15 @@ class SettingsSearchRegistry {
           keywords: ["passkey", "webauthn", "biometric"],
         ),
       SettingsSearchItem(
+        title: l10n.crashReporting,
+        subtitle: l10n.security,
+        sectionPath: l10n.security,
+        icon: HugeIcons.strokeRoundedBug02,
+        routeBuilder: (_) => const SecuritySettingsPage(),
+        isSubPage: true,
+        keywords: ["crash", "bug", "diagnostics"],
+      ),
+      SettingsSearchItem(
         title: l10n.appLock,
         subtitle: l10n.security,
         sectionPath: l10n.security,

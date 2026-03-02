@@ -125,25 +125,6 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
                         ),
                         const SizedBox(height: 8),
                         MenuItemWidgetNew(
-                          title: AppLocalizations.of(context).crashReporting,
-                          leadingIconWidget: _buildIconWidget(
-                            context,
-                            HugeIcons.strokeRoundedBug02,
-                          ),
-                          trailingWidget: ToggleSwitchWidget(
-                            value: () => SuperLogging.shouldReportCrashes(),
-                            onChanged: () async {
-                              await SuperLogging.setShouldReportCrashes(
-                                !SuperLogging.shouldReportCrashes(),
-                              );
-                              if (mounted) {
-                                setState(() {});
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        MenuItemWidgetNew(
                           title: context.l10n.passkey,
                           leadingIconWidget: _buildIconWidget(
                             context,
@@ -164,6 +145,25 @@ class _SecuritySettingsPageState extends State<SecuritySettingsPage> {
                         trailingIcon: Icons.chevron_right_outlined,
                         trailingIconIsMuted: true,
                         onTap: () async => _onAppLockTap(context),
+                      ),
+                      const SizedBox(height: 8),
+                      MenuItemWidgetNew(
+                        title: AppLocalizations.of(context).crashReporting,
+                        leadingIconWidget: _buildIconWidget(
+                          context,
+                          HugeIcons.strokeRoundedBug02,
+                        ),
+                        trailingWidget: ToggleSwitchWidget(
+                          value: () => SuperLogging.shouldReportCrashes(),
+                          onChanged: () async {
+                            await SuperLogging.setShouldReportCrashes(
+                              !SuperLogging.shouldReportCrashes(),
+                            );
+                            if (mounted) {
+                              setState(() {});
+                            }
+                          },
+                        ),
                       ),
                       if (showAccountSecurity) const SizedBox(height: 8),
                       if (showAccountSecurity)
