@@ -17,10 +17,10 @@ pub fn run_face_detection(
     let (input, scaled_width, scaled_height, pad_left, pad_top) =
         preprocess::preprocess_yolo(decoded)?;
     let face_detection = runtime.face_detection_session_mut()?;
-    let (output_shape, output_data) = onnx::run_f32(
+    let output_data = onnx::run_f32_data(
         face_detection,
         input,
-        vec![1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
+        [1, 3, INPUT_HEIGHT as i64, INPUT_WIDTH as i64],
     )?;
 
     let row_len = 16usize;
@@ -75,7 +75,6 @@ pub fn run_face_detection(
         });
     }
 
-    let _ = output_shape;
     Ok(naive_non_max_suppression(detections, IOU_THRESHOLD))
 }
 
