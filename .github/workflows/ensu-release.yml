@@ -101,6 +101,13 @@ jobs:
                   TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
                   MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform.os == 'macos-latest' && '10.15' || '' }}
                   CMAKE_OSX_DEPLOYMENT_TARGET: ${{ matrix.platform.os == 'macos-latest' && '10.15' || '' }}
+                  APPLE_CERTIFICATE: ${{ secrets.MAC_OS_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_OS_CERTIFICATE_PASSWORD }}
+                  APPLE_SIGNING_IDENTITY: "Developer ID Application"
+                  KEYCHAIN_PASSWORD: ${{ secrets.MAC_OS_CERTIFICATE_PASSWORD }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
               with:
                   projectPath: rust/apps/ensu
                   tagName: ${{ github.ref_name }}
@@ -117,24 +124,6 @@ jobs:
                   releaseDraft: true
                   prerelease: false
                   args: ${{ matrix.platform.rust-target != 'x86_64-unknown-linux-gnu' && format('--target {0}', matrix.platform.rust-target) || '' }}
-
-            - name: Install macOS signing dependencies
-              if: matrix.platform.os == 'macos-latest' && env.HAS_MAC_SIGNING == 'true'
-              run: |
-                  pip3 install codemagic-cli-tools --break-system-packages
-              shell: bash
-
-            - name: Add macOS signing certificate
-              if: matrix.platform.os == 'macos-latest' && env.HAS_MAC_SIGNING == 'true'
-              run: |
-                  CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-                  echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
-                  keychain initialize
-                  keychain add-certificates --certificate "$CERTIFICATE_PATH" --certificate-password "$P12_PASSWORD"
-              env:
-                  BUILD_CERTIFICATE_BASE64: ${{ secrets.MAC_OS_CERTIFICATE }}
-                  P12_PASSWORD: ${{ secrets.MAC_OS_CERTIFICATE_PASSWORD }}
-              shell: bash
 
             - name: Locate macOS DMG
               id: macos-dmg
