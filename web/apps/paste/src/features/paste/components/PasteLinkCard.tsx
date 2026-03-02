@@ -1,7 +1,10 @@
 import { Link01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, Stack, Typography } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import { Box, Dialog, IconButton, Stack, Typography } from "@mui/material";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createQrSvgData } from "../utils/qrCode";
 
 interface PasteLinkCardProps {
     link: string;
@@ -11,14 +14,14 @@ interface PasteLinkCardProps {
 
 type LottiePoint = [number, number];
 
-type LottieShapePath = {
+interface LottieShapePath {
     c: boolean;
     i: LottiePoint[];
     o: LottiePoint[];
     v: LottiePoint[];
-};
+}
 
-type ParsedArrowPath = {
+interface ParsedArrowPath {
     color: string;
     d: string;
     lineCap: "butt" | "round" | "square";
@@ -26,20 +29,20 @@ type ParsedArrowPath = {
     name: string;
     strokeScale: number;
     width: number;
-};
+}
 
-type ParsedArrow = {
+interface ParsedArrow {
     height: number;
     paths: ParsedArrowPath[];
     transform: string;
     width: number;
-};
+}
 
-type MeasuredPath = {
+interface MeasuredPath {
     len: number;
     parsed: ParsedArrowPath;
     path: SVGPathElement;
-};
+}
 
 const safePoint = (point?: LottiePoint): [number, number] => [
     point?.[0] ?? 0,
@@ -110,7 +113,9 @@ const parseArrowLottie = (lottie: any): ParsedArrow | null => {
     if (!layer?.shapes?.length) return null;
 
     const sx = (Number(layer?.ks?.s?.k?.[0] ?? 100) || 100) / 100;
-    const sy = (Number(layer?.ks?.s?.k?.[1] ?? layer?.ks?.s?.k?.[0] ?? 100) || 100) / 100;
+    const sy =
+        (Number(layer?.ks?.s?.k?.[1] ?? layer?.ks?.s?.k?.[0] ?? 100) || 100) /
+        100;
     const px = Number(layer?.ks?.p?.k?.[0] ?? 0) || 0;
     const py = Number(layer?.ks?.p?.k?.[1] ?? 0) || 0;
 
@@ -118,13 +123,13 @@ const parseArrowLottie = (lottie: any): ParsedArrow | null => {
     for (const group of layer.shapes) {
         if (group?.ty !== "gr" || !Array.isArray(group?.it)) continue;
 
-        const shape = group.it.find((item: any) => item?.ty === "sh")?.ks
-            ?.k as LottieShapePath | undefined;
+        const shape = group.it.find((item: any) => item?.ty === "sh")?.ks?.k as
+            | LottieShapePath
+            | undefined;
         const stroke = group.it.find((item: any) => item?.ty === "st");
         if (!shape || !stroke) continue;
-
         const groupName = String(group?.nm ?? "");
-        const d = toPathD(shape as LottieShapePath);
+        const d = toPathD(shape);
         if (!d) continue;
 
         paths.push({
@@ -148,11 +153,20 @@ const parseArrowLottie = (lottie: any): ParsedArrow | null => {
     };
 };
 
-export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => {
+export const PasteLinkCard = ({
+    link,
+    onCopy,
+    onShare,
+}: PasteLinkCardProps) => {
     const linkCardRef = useRef<HTMLDivElement | null>(null);
     const arrowSvgRef = useRef<SVGSVGElement | null>(null);
     const [arrow, setArrow] = useState<ParsedArrow | null>(null);
     const [showCopied, setShowCopied] = useState(false);
+    const [showQr, setShowQr] = useState(false);
+    const qrSvgData = useMemo(() => createQrSvgData(link), [link]);
+    const isCompactQrModal = useMediaQuery("(max-width:767px)", {
+        noSsr: true,
+    });
 
     useEffect(() => {
         const linkCard = linkCardRef.current;
@@ -172,6 +186,10 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
             behavior: reduceMotion ? "auto" : "smooth",
             block: "start",
         });
+    }, [link]);
+
+    useEffect(() => {
+        setShowQr(false);
     }, [link]);
 
     useEffect(() => {
@@ -204,7 +222,9 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
         if (!arrow || !svg) return;
 
         const paths = Array.from(
-            svg.querySelectorAll<SVGPathElement>('path[data-arrow-path="true"]'),
+            svg.querySelectorAll<SVGPathElement>(
+                'path[data-arrow-path="true"]',
+            ),
         );
         if (!paths.length) return;
 
@@ -299,10 +319,7 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                 width: "100%",
                 maxWidth: "100%",
                 minWidth: 0,
-                scrollMarginTop: {
-                    xs: "16px",
-                    md: "24px",
-                },
+                scrollMarginTop: { xs: "16px", md: "24px" },
             }}
         >
             <Typography
@@ -321,11 +338,8 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                 spacing={1}
                 alignItems={{ xs: "stretch", sm: "center" }}
                 sx={{
-                    width: {
-                        xs: "calc(100vw - 4rem)",
-                        sm: "100%",
-                    },
-                    maxWidth: { xs: "24rem", sm: "100%" },
+                    width: { xs: "calc(100vw - 4rem)", sm: "100%" },
+                    maxWidth: { xs: "100%" },
                     minWidth: 0,
                     mx: "auto",
                     position: "relative",
@@ -442,7 +456,9 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                                         d={path.d}
                                         fill="none"
                                         stroke={path.color}
-                                        strokeWidth={path.width * path.strokeScale}
+                                        strokeWidth={
+                                            path.width * path.strokeScale
+                                        }
                                         strokeLinecap={path.lineCap}
                                         strokeLinejoin={path.lineJoin}
                                     />
@@ -507,7 +523,9 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                                         d={path.d}
                                         fill="none"
                                         stroke={path.color}
-                                        strokeWidth={path.width * path.strokeScale}
+                                        strokeWidth={
+                                            path.width * path.strokeScale
+                                        }
                                         strokeLinecap={path.lineCap}
                                         strokeLinejoin={path.lineJoin}
                                     />
@@ -517,64 +535,61 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                     </Box>
                 )}
                 <Stack
-                    direction="row"
-                    spacing={{ xs: 1.2, sm: 3.2 }}
-                    alignItems="flex-end"
-                    justifyContent={{ xs: "flex-start", sm: "flex-start" }}
+                    spacing={{ xs: 0.18, sm: 0.32 }}
                     sx={{
                         width: { xs: "100%", sm: "auto" },
-                        maxWidth: { xs: 220, sm: "none" },
+                        maxWidth: { xs: 280, sm: "none" },
                         pl: { xs: 0, sm: 0 },
                         mx: { xs: "auto", sm: 0 },
-                        transform: { xs: "translate(58px, 48px)", sm: "none" },
+                        transform: { xs: "translate(86px, 50px)", sm: "none" },
+                        "@media (max-width:444.95px)": {
+                            transform: "translate(126px, 50px)",
+                        },
                     }}
                 >
-                    <Typography
-                        component="button"
-                        onClick={() => {
-                            void onShare(link);
-                        }}
-                        sx={{
-                            fontFamily:
-                                '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
-                            fontSize: { xs: "2rem", sm: "2.5rem" },
-                            color: "#2f6df7",
-                            background: "none",
-                            border: "none",
-                            p: 0,
-                            m: 0,
-                            lineHeight: 1,
-                            cursor: "pointer",
-                            textDecoration: "underline",
-                            textUnderlineOffset: "3px",
-                            transform: {
-                                xs: "translateX(20px) rotate(-3deg)",
-                                sm: "translateY(68px) rotate(-4deg)",
-                            },
-                            "&:hover": {
-                                color: "#5d92ff",
-                                textDecoration: "underline",
-                                textUnderlineOffset: "3px",
-                            },
-                        }}
+                    <Stack
+                        direction="row"
+                        spacing={{ xs: 1.2, sm: 2.8 }}
+                        alignItems="flex-end"
+                        justifyContent={{ xs: "flex-start", sm: "flex-start" }}
                     >
-                        Share
-                    </Typography>
-                    <Box
-                        sx={{
-                            transform: {
-                                xs: "rotate(3deg)",
-                                sm: "translateY(94px) rotate(4deg)",
-                            },
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            minWidth: { xs: 72, sm: 84 },
-                        }}
-                    >
+                        <IconButton
+                            aria-label={
+                                showQr ? "Hide QR code" : "Show QR code"
+                            }
+                            aria-pressed={showQr}
+                            onClick={() => {
+                                setShowQr((value) => !value);
+                            }}
+                            sx={{
+                                width: { xs: 36, sm: 40 },
+                                height: { xs: 36, sm: 40 },
+                                borderRadius: "11px",
+                                border: "1px solid rgba(244, 247, 255, 0.35)",
+                                bgcolor: showQr
+                                    ? "rgba(244, 247, 255, 0.22)"
+                                    : "rgba(244, 247, 255, 0.12)",
+                                color: "#f4f7ff",
+                                transform: {
+                                    xs: "translateY(4px) rotate(-4deg)",
+                                    sm: "translateY(74px) rotate(-4deg)",
+                                },
+                                "&:hover": {
+                                    bgcolor: showQr
+                                        ? "rgba(244, 247, 255, 0.28)"
+                                        : "rgba(244, 247, 255, 0.18)",
+                                },
+                            }}
+                        >
+                            <QrCode2RoundedIcon
+                                sx={{ fontSize: { xs: 21, sm: 23 } }}
+                            />
+                        </IconButton>
                         <Typography
                             component="button"
-                            onClick={handleCopyClick}
+                            onClick={() => {
+                                void onShare(link);
+                            }}
                             sx={{
                                 fontFamily:
                                     '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
@@ -588,6 +603,10 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                                 cursor: "pointer",
                                 textDecoration: "underline",
                                 textUnderlineOffset: "3px",
+                                transform: {
+                                    xs: "rotate(-3deg)",
+                                    sm: "translateY(68px) rotate(-4deg)",
+                                },
                                 "&:hover": {
                                     color: "#5d92ff",
                                     textDecoration: "underline",
@@ -595,29 +614,181 @@ export const PasteLinkCard = ({ link, onCopy, onShare }: PasteLinkCardProps) => 
                                 },
                             }}
                         >
-                            Copy
+                            Share
                         </Typography>
-                        <Typography
-                            variant="mini"
+                        <Box
                             sx={{
-                                fontFamily:
-                                    '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
-                                mt: 0.5,
-                                minHeight: "1.1rem",
-                                color: "rgba(182, 190, 208, 0.9)",
-                                fontSize: "0.94rem",
-                                fontWeight: 600,
-                                lineHeight: 1,
-                                letterSpacing: "0.06em",
-                                opacity: showCopied ? 1 : 0,
-                                transition: "opacity 150ms ease",
-                                pointerEvents: "none",
+                                transform: {
+                                    xs: "rotate(3deg)",
+                                    sm: "translateY(94px) rotate(4deg)",
+                                },
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                minWidth: 0,
+                                position: "relative",
                             }}
                         >
-                            Copied to clipboard.
-                        </Typography>
-                    </Box>
+                            <Typography
+                                component="button"
+                                onClick={handleCopyClick}
+                                sx={{
+                                    fontFamily:
+                                        '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
+                                    fontSize: { xs: "2rem", sm: "2.5rem" },
+                                    color: "#2f6df7",
+                                    background: "none",
+                                    border: "none",
+                                    p: 0,
+                                    m: 0,
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                    textDecoration: "underline",
+                                    textUnderlineOffset: "3px",
+                                    "&:hover": {
+                                        color: "#5d92ff",
+                                        textDecoration: "underline",
+                                        textUnderlineOffset: "3px",
+                                    },
+                                }}
+                            >
+                                Copy
+                            </Typography>
+                            <Typography
+                                variant="mini"
+                                sx={{
+                                    fontFamily:
+                                        '"Gochi Hand", "Comic Sans MS", "Bradley Hand", cursive',
+                                    position: "absolute",
+                                    top: "100%",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    mt: 0.5,
+                                    whiteSpace: "nowrap",
+                                    color: "rgba(182, 190, 208, 0.9)",
+                                    fontSize: "0.94rem",
+                                    fontWeight: 600,
+                                    lineHeight: 1,
+                                    letterSpacing: "0.06em",
+                                    opacity: showCopied ? 1 : 0,
+                                    transition: "opacity 150ms ease",
+                                    pointerEvents: "none",
+                                }}
+                            >
+                                Copied to clipboard.
+                            </Typography>
+                        </Box>
+                    </Stack>
+                    {showQr && qrSvgData && !isCompactQrModal && (
+                        <Box
+                            sx={{
+                                position: "fixed",
+                                right: { xs: 22, sm: 32, md: 42 },
+                                bottom: { xs: 28, sm: 38, md: 50 },
+                                zIndex: 1300,
+                                p: 0.95,
+                                borderRadius: "14px",
+                                border: "1px solid rgba(47, 109, 247, 0.4)",
+                                bgcolor: "rgba(47, 109, 247, 0.14)",
+                                boxShadow: "0 10px 24px rgba(0, 0, 0, 0.22)",
+                                backdropFilter: "blur(8px) saturate(106%)",
+                                WebkitBackdropFilter:
+                                    "blur(8px) saturate(106%)",
+                            }}
+                        >
+                            <Box
+                                component="svg"
+                                viewBox={`0 0 ${qrSvgData.viewBoxSize} ${qrSvgData.viewBoxSize}`}
+                                role="img"
+                                aria-label="QR code for paste link"
+                                sx={{
+                                    display: "block",
+                                    width: { xs: 144, sm: 168, md: 184 },
+                                    height: { xs: 144, sm: 168, md: 184 },
+                                    borderRadius: "10px",
+                                    bgcolor: "#fff",
+                                    p: 1,
+                                }}
+                            >
+                                {qrSvgData.modules.map((module) => (
+                                    <rect
+                                        key={`${module.x}-${module.y}`}
+                                        x={module.x}
+                                        y={module.y}
+                                        width={1}
+                                        height={1}
+                                        rx={module.finder ? 0.08 : 0.34}
+                                        fill={
+                                            module.finder
+                                                ? "#1d3d9f"
+                                                : "#2f6df7"
+                                        }
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+                    )}
                 </Stack>
+                {showQr && qrSvgData && isCompactQrModal && (
+                    <Dialog
+                        open
+                        onClose={() => {
+                            setShowQr(false);
+                        }}
+                        maxWidth={false}
+                        slotProps={{
+                            backdrop: {
+                                sx: {
+                                    bgcolor: "rgba(5, 10, 24, 0.72)",
+                                    backdropFilter: "blur(2px)",
+                                },
+                            },
+                            paper: {
+                                sx: {
+                                    m: 2,
+                                    borderRadius: "18px",
+                                    border: "1px solid rgba(47, 109, 247, 0.44)",
+                                    bgcolor: "rgba(9, 18, 48, 0.9)",
+                                    boxShadow:
+                                        "0 16px 40px rgba(0, 0, 0, 0.42)",
+                                },
+                            },
+                        }}
+                    >
+                        <Box sx={{ p: 1.15 }}>
+                            <Box
+                                component="svg"
+                                viewBox={`0 0 ${qrSvgData.viewBoxSize} ${qrSvgData.viewBoxSize}`}
+                                role="img"
+                                aria-label="QR code for paste link"
+                                sx={{
+                                    display: "block",
+                                    width: 226,
+                                    height: 226,
+                                    borderRadius: "12px",
+                                    bgcolor: "#fff",
+                                    p: 1.1,
+                                }}
+                            >
+                                {qrSvgData.modules.map((module) => (
+                                    <rect
+                                        key={`${module.x}-${module.y}`}
+                                        x={module.x}
+                                        y={module.y}
+                                        width={1}
+                                        height={1}
+                                        rx={module.finder ? 0.08 : 0.34}
+                                        fill={
+                                            module.finder
+                                                ? "#1d3d9f"
+                                                : "#2f6df7"
+                                        }
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+                    </Dialog>
+                )}
             </Box>
         </Stack>
     );
