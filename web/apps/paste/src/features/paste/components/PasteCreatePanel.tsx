@@ -105,7 +105,7 @@ export const PasteCreatePanel = ({
                                 },
                             },
                             "& .MuiInputBase-input": {
-                                fontSize: { xs: "0.98rem", sm: "1.05rem" },
+                                fontSize: { xs: "0.9rem", sm: "0.96rem" },
                                 lineHeight: 1.6,
                             },
                         },
@@ -163,6 +163,8 @@ export const PasteCreatePanel = ({
                             pointerEvents: "auto",
                             width: { xs: 34, sm: 38 },
                             height: { xs: 34, sm: 38 },
+                            marginBottom: { xs: "3px", sm: "4px" },
+                            marginRight: { xs: "-1px", sm: "-2px" },
                             borderRadius: { xs: "12px", sm: "14px" },
                             bgcolor: frameBlue,
                             color: "#f4f7ff",

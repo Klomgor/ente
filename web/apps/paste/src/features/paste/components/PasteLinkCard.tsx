@@ -1,7 +1,15 @@
 import { Link01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
-import { Box, Dialog, IconButton, Stack, Typography } from "@mui/material";
+import {
+    Box,
+    Button,
+    Dialog,
+    IconButton,
+    Stack,
+    Typography,
+} from "@mui/material";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -28,11 +36,18 @@ export const PasteLinkCard = ({
     onCopy,
     onShare,
 }: PasteLinkCardProps) => {
+    const inputGlassBg = "rgba(39, 42, 52, 0.76)";
+    const inputGlassBorder = "rgba(213, 225, 255, 0.14)";
+    const inputGlassSurface =
+        "linear-gradient(160deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 58%, rgba(255, 255, 255, 0.015) 100%)";
+    const inputGlassShadow =
+        "0 12px 28px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.1)";
     const linkCardRef = useRef<HTMLDivElement | null>(null);
     const arrowSvgRef = useRef<SVGSVGElement | null>(null);
     const [arrow, setArrow] = useState<ParsedArrow | null>(null);
     const [showCopied, setShowCopied] = useState(false);
     const [showQr, setShowQr] = useState(false);
+    const [showViewConfirm, setShowViewConfirm] = useState(false);
     const qrSvgData = useMemo(() => createQrSvgData(link), [link]);
     const isCompactQrModal = useMediaQuery("(max-width:767px)", {
         noSsr: true,
@@ -180,6 +195,20 @@ export const PasteLinkCard = ({
             });
     };
 
+    const handleCloseViewConfirm = () => {
+        setShowViewConfirm(false);
+    };
+
+    const handleCopyFromConfirm = () => {
+        handleCloseViewConfirm();
+        handleCopyClick();
+    };
+
+    const handleConfirmOpenLink = () => {
+        handleCloseViewConfirm();
+        window.open(link, "_blank", "noopener,noreferrer");
+    };
+
     return (
         <Stack
             ref={linkCardRef}
@@ -241,6 +270,10 @@ export const PasteLinkCard = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         title={link}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            setShowViewConfirm(true);
+                        }}
                         sx={{
                             display: "flex",
                             alignItems: "center",
@@ -598,6 +631,141 @@ export const PasteLinkCard = ({
                         </Box>
                     )}
                 </Stack>
+                <Dialog
+                    open={showViewConfirm}
+                    onClose={handleCloseViewConfirm}
+                    maxWidth="xs"
+                    fullWidth
+                    slotProps={{
+                        backdrop: {
+                            sx: {
+                                bgcolor: "rgba(5, 10, 24, 0.74)",
+                                backdropFilter: "blur(2px)",
+                            },
+                        },
+                        paper: {
+                            sx: {
+                                mx: 2,
+                                borderRadius: "20px",
+                                border: "1px solid",
+                                borderColor: inputGlassBorder,
+                                bgcolor: inputGlassBg,
+                                background: inputGlassSurface,
+                                boxShadow: inputGlassShadow,
+                                backdropFilter: "blur(9px) saturate(112%)",
+                                WebkitBackdropFilter:
+                                    "blur(9px) saturate(112%)",
+                            },
+                        },
+                    }}
+                >
+                    <Box
+                        sx={{ p: { xs: 2.1, sm: 2.35 }, position: "relative" }}
+                    >
+                        <IconButton
+                            aria-label="Close confirmation dialog"
+                            onClick={handleCloseViewConfirm}
+                            size="small"
+                            sx={{
+                                position: "absolute",
+                                top: 10,
+                                right: 10,
+                                color: "rgba(225, 233, 255, 0.86)",
+                            }}
+                        >
+                            <CloseRoundedIcon fontSize="small" />
+                        </IconButton>
+                        <Typography
+                            aria-hidden="true"
+                            sx={{
+                                fontSize: "1.85rem",
+                                lineHeight: 1,
+                                textAlign: "center",
+                                mb: 0.6,
+                            }}
+                        >
+                            👀
+                        </Typography>
+                        <Typography
+                            sx={{
+                                color: "rgba(244, 247, 255, 0.95)",
+                                fontWeight: 700,
+                                fontSize: { xs: "1rem", sm: "1.06rem" },
+                                lineHeight: 1.3,
+                                textAlign: "center",
+                            }}
+                        >
+                            Open one-time link?
+                        </Typography>
+                        <Typography
+                            sx={{
+                                mt: 1,
+                                color: "rgba(220, 229, 255, 0.82)",
+                                fontSize: { xs: "0.88rem", sm: "0.91rem" },
+                                lineHeight: 1.5,
+                                textAlign: "center",
+                            }}
+                        >
+                            This link can be opened only once. Not ready yet?
+                            Copy the link instead.
+                        </Typography>
+                        <Stack
+                            direction="row"
+                            spacing={1.1}
+                            justifyContent="center"
+                            sx={{ mt: 2.2, width: "100%" }}
+                        >
+                            <Button
+                                onClick={handleCopyFromConfirm}
+                                sx={{
+                                    textTransform: "none",
+                                    fontSize: { xs: "0.88rem", sm: "0.9rem" },
+                                    fontWeight: 600,
+                                    letterSpacing: "0.01em",
+                                    minWidth: { xs: 122, sm: 132 },
+                                    py: 0.58,
+                                    px: 1.5,
+                                    borderRadius: "10px",
+                                    borderColor: "rgba(214, 226, 255, 0.28)",
+                                    color: "rgba(236, 242, 255, 0.95)",
+                                    "&:hover": {
+                                        borderColor:
+                                            "rgba(214, 226, 255, 0.44)",
+                                        bgcolor: "rgba(255, 255, 255, 0.06)",
+                                    },
+                                }}
+                                variant="outlined"
+                            >
+                                Copy link
+                            </Button>
+                            <Button
+                                onClick={handleConfirmOpenLink}
+                                sx={{
+                                    textTransform: "none",
+                                    fontSize: { xs: "0.88rem", sm: "0.9rem" },
+                                    fontWeight: 600,
+                                    letterSpacing: "0.01em",
+                                    minWidth: { xs: 122, sm: 132 },
+                                    py: 0.58,
+                                    px: 1.5,
+                                    borderRadius: "10px",
+                                    bgcolor: "#2f6df7",
+                                    color: "#f4f7ff",
+                                    boxShadow:
+                                        "0 2px 8px rgba(47, 109, 247, 0.2)",
+                                    "&:hover": {
+                                        bgcolor: "#4c86ff",
+                                        boxShadow:
+                                            "0 3px 10px rgba(47, 109, 247, 0.24)",
+                                    },
+                                }}
+                                variant="contained"
+                            >
+                                Open Link
+                            </Button>
+                        </Stack>
+                    </Box>
+                </Dialog>
                 {showQr && qrSvgData && isCompactQrModal && (
                     <Dialog
                         open
