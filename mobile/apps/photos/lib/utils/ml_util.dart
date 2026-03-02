@@ -80,7 +80,7 @@ Future<IndexStatus> getIndexStatus() async {
     final showPendingFiles = math.max(indexableFiles - indexedFiles, 0);
     final hasWifiEnabled = await canUseHighBandwidth();
     _logger.info(
-      "Shown IndexStatus: indexedFiles: $showIndexedFiles, pendingFiles: $showPendingFiles, hasWifiEnabled: $hasWifiEnabled. Real values: indexedFiles: $indexedFiles (faces: $facesIndexedFiles, clip: $clipIndexedFiles), indexableFiles: $indexableFiles",
+      "Shown IndexStatus: indexedFiles: $showIndexedFiles, pendingFiles: $showPendingFiles, hasWifiEnabled: $hasWifiEnabled, ifOffline: $isOfflineMode. Real values: indexedFiles: $indexedFiles (faces: $facesIndexedFiles, clip: $clipIndexedFiles), indexableFiles: $indexableFiles",
     );
     return IndexStatus(showIndexedFiles, showPendingFiles, hasWifiEnabled);
   } catch (e, s) {
