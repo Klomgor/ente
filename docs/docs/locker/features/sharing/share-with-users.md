@@ -23,10 +23,7 @@ When you share a collection with another Ente user:
 2. Tap the share button
 3. Select **Share with Ente user**
 4. Enter the person's Ente email address
-5. Choose the permission level:
-   - **Viewer**: Can view only
-   - **Collaborator**: Can view and add items
-6. Tap **Share**
+5. Tap **Share**
 
 All items in the collection will be shared.
 
