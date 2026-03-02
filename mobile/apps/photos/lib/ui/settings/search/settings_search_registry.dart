@@ -251,7 +251,7 @@ class SettingsSearchRegistry {
         icon: HugeIcons.strokeRoundedBug02,
         routeBuilder: (_) => const SecuritySettingsPage(),
         isSubPage: true,
-        keywords: ["crash", "bug", "diagnostics"],
+        keywords: ["crash", "reporting", "diagnostics"],
       ),
       SettingsSearchItem(
         title: l10n.appLock,
