@@ -34,7 +34,7 @@ struct FaceDetectionAbsolute {
 pub fn run_face_alignment(
     file_id: i64,
     decoded: &DecodedImage,
-    detections: &[FaceDetection],
+    detections: Vec<FaceDetection>,
 ) -> MlResult<(Vec<Vec<f32>>, Vec<FaceResult>)> {
     let source = rgb_image_from_decoded(decoded)?;
     let mut aligned_face_inputs = Vec::with_capacity(detections.len());
@@ -42,7 +42,7 @@ pub fn run_face_alignment(
 
     for detection in detections {
         let absolute_detection = to_absolute_detection(
-            detection,
+            &detection,
             decoded.dimensions.width,
             decoded.dimensions.height,
         );
@@ -54,7 +54,7 @@ pub fn run_face_alignment(
 
         aligned_face_inputs.push(normalized);
         face_results.push(FaceResult {
-            detection: detection.clone(),
+            detection,
             blur_value,
             alignment,
             embedding: Vec::new(),

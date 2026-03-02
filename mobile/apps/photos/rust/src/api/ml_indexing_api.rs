@@ -125,7 +125,7 @@ fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageRe
             Some(Vec::new())
         } else {
             let (aligned, mut face_results) =
-                run_face_alignment(req.file_id, &decoded, &detections)?;
+                run_face_alignment(req.file_id, &decoded, detections)?;
             runtime::with_runtime_mut(&runtime_config, |runtime| {
                 run_face_embedding(runtime, &aligned, &mut face_results)
             })?;
@@ -148,7 +148,7 @@ fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageRe
 
     Ok(AnalyzeImageResult {
         file_id: req.file_id,
-        decoded_image_size: dims.clone(),
+        decoded_image_size: dims,
         faces,
         clip,
     })
