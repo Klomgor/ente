@@ -173,9 +173,8 @@ export const parseArrowLottie = (lottie: unknown): ParsedArrow | null => {
         ? toNumberArray(toNestedRecord(ks, "p")?.k)
         : undefined;
 
-    const sx = (toNumber(scaleValues?.[0], 100) || 100) / 100;
-    const sy =
-        (toNumber(scaleValues?.[1], scaleValues?.[0] ?? 100) || 100) / 100;
+    const sx = toNumber(scaleValues?.[0], 100) / 100;
+    const sy = toNumber(scaleValues?.[1], scaleValues?.[0] ?? 100) / 100;
     const px = toNumber(positionValues?.[0], 0) || 0;
     const py = toNumber(positionValues?.[1], 0) || 0;
 

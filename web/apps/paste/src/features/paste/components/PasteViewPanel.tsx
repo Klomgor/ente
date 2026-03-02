@@ -151,6 +151,7 @@ export const PasteViewPanel = ({
                             minRows={10}
                             value={resolvedText}
                             slotProps={{
+                                htmlInput: { "aria-label": "Paste contents" },
                                 input: {
                                     readOnly: true,
                                     disableUnderline: true,
@@ -220,7 +221,9 @@ export const PasteViewPanel = ({
                                 size="small"
                                 disableElevation
                                 onClick={() => {
-                                    void onCopyText(resolvedText);
+                                    void onCopyText(resolvedText).catch(() => {
+                                        // Ignore errors to avoid unhandled rejections in click handlers.
+                                    });
                                 }}
                                 startIcon={
                                     <ContentCopyRoundedIcon

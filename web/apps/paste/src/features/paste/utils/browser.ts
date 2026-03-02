@@ -30,7 +30,10 @@ export const shareUrlOrCopy = async (url: string) => {
 
     try {
         await share.call(navigator, { url });
-    } catch {
-        // no-op on user cancellation
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+            return;
+        }
+        await copyTextToClipboard(url);
     }
 };

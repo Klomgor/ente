@@ -66,7 +66,10 @@ export const PasteCreatePanel = ({
                     fullWidth
                     slotProps={{
                         input: { disableUnderline: true },
-                        htmlInput: { maxLength: MAX_PASTE_CHARS },
+                        htmlInput: {
+                            maxLength: MAX_PASTE_CHARS,
+                            "aria-label": "Paste text",
+                        },
                     }}
                     multiline
                     minRows={5}

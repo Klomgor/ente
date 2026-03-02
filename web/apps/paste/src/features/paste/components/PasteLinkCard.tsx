@@ -168,7 +168,9 @@ export const PasteLinkCard = ({
         });
 
         return () => {
-            animations.forEach((anim) => anim.cancel());
+            animations.forEach((anim) => {
+                anim.cancel();
+            });
         };
     }, [arrow]);
 

@@ -166,10 +166,9 @@ namespace qrcodegen {
             // Pack bits into bytes in big endian
             let dataCodewords: Array<byte> = [];
             while (dataCodewords.length * 8 < bb.length) dataCodewords.push(0);
-            bb.forEach(
-                (b: bit, i: int) =>
-                    (dataCodewords[i >>> 3] |= b << (7 - (i & 7))),
-            );
+            bb.forEach((b: bit, i: int) => {
+                dataCodewords[i >>> 3] |= b << (7 - (i & 7));
+            });
 
             // Create the QR Code object
             return new QrCode(version, ecl, dataCodewords, mask);
@@ -706,10 +705,9 @@ namespace qrcodegen {
                 // Polynomial division
                 const factor: byte = b ^ (result.shift() as byte);
                 result.push(0);
-                divisor.forEach(
-                    (coef, i) =>
-                        (result[i] ^= QrCode.reedSolomonMultiply(coef, factor)),
-                );
+                divisor.forEach((coef, i) => {
+                    result[i] ^= QrCode.reedSolomonMultiply(coef, factor);
+                });
             }
             return result;
         }
