@@ -117,36 +117,40 @@ fn analyze_image_rust_inner(req: AnalyzeImageRequest) -> MlResult<AnalyzeImageRe
         height: decoded.dimensions.height as i32,
     };
 
-    runtime::with_runtime_mut(&runtime_config, |runtime| {
-        let faces = if req.run_faces {
-            let detections = run_face_detection(runtime, &decoded)?;
-            if detections.is_empty() {
-                Some(Vec::new())
-            } else {
-                let (aligned, mut face_results) =
-                    run_face_alignment(req.file_id, &decoded, &detections)?;
-                run_face_embedding(runtime, &aligned, &mut face_results)?;
-                Some(face_results.into_iter().map(to_api_face_result).collect())
-            }
+    let faces = if req.run_faces {
+        let detections = runtime::with_runtime_mut(&runtime_config, |runtime| {
+            run_face_detection(runtime, &decoded)
+        })?;
+        if detections.is_empty() {
+            Some(Vec::new())
         } else {
-            None
-        };
+            let (aligned, mut face_results) =
+                run_face_alignment(req.file_id, &decoded, &detections)?;
+            runtime::with_runtime_mut(&runtime_config, |runtime| {
+                run_face_embedding(runtime, &aligned, &mut face_results)
+            })?;
+            Some(face_results.into_iter().map(to_api_face_result).collect())
+        }
+    } else {
+        None
+    };
 
-        let clip = if req.run_clip {
-            let clip = run_clip_image(runtime, &decoded)?;
-            Some(RustClipResult {
-                embedding: clip.embedding.into_iter().map(|v| v as f64).collect(),
-            })
-        } else {
-            None
-        };
-
-        Ok(AnalyzeImageResult {
-            file_id: req.file_id,
-            decoded_image_size: dims.clone(),
-            faces,
-            clip,
+    let clip = if req.run_clip {
+        let clip = runtime::with_runtime_mut(&runtime_config, |runtime| {
+            run_clip_image(runtime, &decoded)
+        })?;
+        Some(RustClipResult {
+            embedding: clip.embedding.into_iter().map(|v| v as f64).collect(),
         })
+    } else {
+        None
+    };
+
+    Ok(AnalyzeImageResult {
+        file_id: req.file_id,
+        decoded_image_size: dims.clone(),
+        faces,
+        clip,
     })
 }
 
