@@ -1,6 +1,6 @@
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Box, IconButton, TextField, Typography } from "@mui/material";
+import { Box, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
 import { MAX_PASTE_CHARS } from "../constants";
 import { PasteLinkCard } from "./PasteLinkCard";
 import { pasteTextFieldSx } from "./textFieldSx";
@@ -32,6 +32,7 @@ export const PasteCreatePanel = ({
     const inputGlassBorder = "rgba(213, 225, 255, 0.14)";
     const nearLimitThreshold = Math.floor(MAX_PASTE_CHARS * 0.9);
     const isNearCharLimit = inputText.length >= nearLimitThreshold;
+    const isCreateDisabled = isInputEmpty;
     const mutedCounterColor = "rgba(234, 238, 255, 0.6)";
     const softBlueCounterColor = "rgba(204, 224, 255, 0.96)";
     const privacyPills = [
@@ -75,8 +76,11 @@ export const PasteCreatePanel = ({
                         ),
                         {
                             "& .MuiFilledInput-root": {
-                                paddingBottom: { xs: "76px", sm: "84px" },
-                                padding: { xs: "12px", sm: "14px" },
+                                paddingTop: { xs: "12px", sm: "14px" },
+                                paddingRight: { xs: "12px", sm: "14px" },
+                                paddingLeft: { xs: "12px", sm: "14px" },
+                                // Keep only the minimum reserve needed for the footer row.
+                                paddingBottom: { xs: "50px", sm: "56px" },
                                 backdropFilter: "blur(9px) saturate(112%)",
                                 WebkitBackdropFilter: "blur(9px) saturate(112%)",
                                 background:
@@ -112,11 +116,11 @@ export const PasteCreatePanel = ({
                         position: "absolute",
                         left: { xs: 12, sm: 18 },
                         right: { xs: 12, sm: 18 },
-                        bottom: { xs: 12, sm: 18 },
-                        height: { xs: 44, sm: 48 },
+                        bottom: { xs: 8, sm: 10 },
+                        height: { xs: 36, sm: 40 },
                         display: "flex",
                         justifyContent: "space-between",
-                        alignItems: "flex-end",
+                        alignItems: "center",
                         gap: { xs: 1, sm: 2 },
                         pointerEvents: "none",
                     }}
@@ -126,11 +130,7 @@ export const PasteCreatePanel = ({
                         sx={{
                             display: "flex",
                             alignItems: "center",
-                            height: { xs: 40, sm: 44 },
-                            transform: {
-                                xs: "translateY(8px)",
-                                md: "translateY(12px)",
-                            },
+                            height: { xs: 32, sm: 36 },
                             color: mutedCounterColor,
                             fontWeight: 600,
                             lineHeight: 1,
@@ -153,14 +153,16 @@ export const PasteCreatePanel = ({
                     </Typography>
                     <IconButton
                         aria-label="Create secure link"
+                        aria-busy={creating}
                         onClick={() => {
+                            if (creating || isCreateDisabled) return;
                             void onCreate();
                         }}
-                        disabled={creating || isInputEmpty}
+                        disabled={isCreateDisabled}
                         sx={{
                             pointerEvents: "auto",
-                            width: { xs: 40, sm: 44 },
-                            height: { xs: 40, sm: 44 },
+                            width: { xs: 34, sm: 38 },
+                            height: { xs: 34, sm: 38 },
                             borderRadius: { xs: "12px", sm: "14px" },
                             bgcolor: frameBlue,
                             color: "#f4f7ff",
@@ -170,27 +172,35 @@ export const PasteCreatePanel = ({
                                 boxShadow: "none",
                             },
                             "&.Mui-disabled": {
-                                bgcolor: isInputEmpty
+                                bgcolor: isCreateDisabled
                                     ? "rgba(255, 255, 255, 0.18)"
                                     : "rgba(47, 109, 247, 0.45)",
-                                color: isInputEmpty
+                                color: isCreateDisabled
                                     ? "rgba(230, 236, 255, 0.44)"
                                     : "rgba(244, 247, 255, 0.72)",
                             },
                         }}
                     >
-                        <Box
-                            sx={{
-                                transform: "rotate(90deg)",
-                                display: "flex",
-                            }}
-                        >
-                            <HugeiconsIcon
-                                icon={Navigation06Icon}
-                                size={18}
-                                strokeWidth={2}
+                        {creating ? (
+                            <CircularProgress
+                                size={17}
+                                thickness={5.2}
+                                sx={{ color: "rgba(244, 247, 255, 0.95)" }}
                             />
-                        </Box>
+                        ) : (
+                            <Box
+                                sx={{
+                                    transform: "rotate(90deg)",
+                                    display: "flex",
+                                }}
+                            >
+                                <HugeiconsIcon
+                                    icon={Navigation06Icon}
+                                    size={18}
+                                    strokeWidth={2}
+                                />
+                            </Box>
+                        )}
                     </IconButton>
                 </Box>
             </Box>

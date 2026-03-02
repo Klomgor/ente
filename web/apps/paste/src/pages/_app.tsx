@@ -18,15 +18,6 @@ const App: React.FC<AppProps> = ({ Component, pageProps }) => {
         >
             <CustomHead title="Ente Paste" />
             <CssBaseline enableColorScheme />
-            <style jsx global>{`
-                html,
-                body,
-                #__next {
-                    width: 100%;
-                    max-width: 100%;
-                    overflow-x: hidden;
-                }
-            `}</style>
             <Component {...pageProps} />
         </ThemeProvider>
     );

@@ -1,5 +1,4 @@
 import { Stack } from "@mui/material";
-import Head from "next/head";
 import { PasteCreatePanel } from "features/paste/components/PasteCreatePanel";
 import { PasteFooter } from "features/paste/components/PasteFooter";
 import { PasteFrame } from "features/paste/components/PasteFrame";
@@ -11,6 +10,7 @@ import {
     copyTextToClipboard,
     shareUrlOrCopy,
 } from "features/paste/utils/browser";
+import Head from "next/head";
 
 const Page = () => {
     const { mode, accessToken } = usePasteRoute();
@@ -35,6 +35,14 @@ const Page = () => {
                 <meta
                     name="description"
                     content="Share sensitive text with one-time, end-to-end encrypted links that auto-expire after 24 hours."
+                />
+                <meta
+                    property="og:image"
+                    content="https://paste.ente.io/images/metaimage.png"
+                />
+                <meta
+                    name="twitter:image"
+                    content="https://paste.ente.io/images/metaimage.png"
                 />
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link
