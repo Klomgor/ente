@@ -37,7 +37,7 @@ export const PasteFooter = () => (
                 textAlign: "center",
             }}
         >
-            THE ENTE E2EE ECOSYSTEM
+            ENTE E2EE ECOSYSTEM
         </Typography>
     </Stack>
 );
