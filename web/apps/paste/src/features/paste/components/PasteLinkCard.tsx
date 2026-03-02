@@ -333,6 +333,9 @@ export const PasteLinkCard = ({
                             display: { xs: "block", sm: "none" },
                             position: "absolute",
                             left: { xs: 18 },
+                            "@media (max-width:449.95px)": {
+                                left: 6,
+                            },
                             top: "100%",
                             mt: "-22px",
                             width: 132,
@@ -444,8 +447,8 @@ export const PasteLinkCard = ({
                         pl: { xs: 0, sm: 0 },
                         mx: { xs: "auto", sm: 0 },
                         transform: { xs: "translate(86px, 50px)", sm: "none" },
-                        "@media (max-width:444.95px)": {
-                            transform: "translate(126px, 50px)",
+                        "@media (max-width:449.95px)": {
+                            transform: "translate(96px, 50px)",
                         },
                     }}
                 >

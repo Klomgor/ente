@@ -1,6 +1,7 @@
 import { Navigation06Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Box, CircularProgress, IconButton, TextField, Typography } from "@mui/material";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { MAX_PASTE_CHARS } from "../constants";
 import { PasteLinkCard } from "./PasteLinkCard";
 import { pasteTextFieldSx } from "./textFieldSx";
@@ -26,6 +27,7 @@ export const PasteCreatePanel = ({
     onCopyLink,
     onShareLink,
 }: PasteCreatePanelProps) => {
+    const isMobile = useMediaQuery("(max-width:599.95px)", { noSsr: true });
     const isInputEmpty = inputText.trim().length === 0;
     const frameBlue = "#2f6df7";
     const inputGlassBg = "rgba(39, 42, 52, 0.76)";
@@ -37,7 +39,7 @@ export const PasteCreatePanel = ({
     const softBlueCounterColor = "rgba(204, 224, 255, 0.96)";
     const privacyPills = [
         "Private",
-        "End To End Encrypted",
+        isMobile ? "E2EE" : "End To End Encrypted",
         "One-Time View",
         "Deletes In 24 Hrs",
     ];
