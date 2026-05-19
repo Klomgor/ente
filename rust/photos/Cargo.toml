@@ -9,7 +9,7 @@ quick-xml = "0.37"
 usearch = "2.21.3"
 fast_image_resize = { version = "5.5.0", features = ["image", "rayon"] }
 image = { version = "0.25.5", default-features = true }
-imageproc = "0.25.0"
+imageproc = "0.25.1"
 nalgebra = "0.33.2"
 ndarray = "0.16.1"
 half = "2.1"
